@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BRKER — Game Flow Report</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #ffffff;
+  --bg2: #f7f7f8;
+  --bg3: #f0f0f2;
+  --border: #e4e4e8;
+  --border2: #d0d0d6;
+  --text: #111114;
+  --muted: #7a7a85;
+  --muted2: #b0b0b8;
+  --accent: #1a1aff;
+  --red: #e02020;
+  --amber: #e07c00;
+  --green: #0a8a4a;
+  --purple: #7c3aed;
+  --blue: #0060df;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans', sans-serif;
+}
+html { font-size: 15px; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); font-weight: 400; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+
+/* ── Page ── */
+.page { max-width: 1060px; margin: 0 auto; padding: 3rem 2rem 6rem; }
+
+/* ── Header ── */
+.header { display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 2rem; padding-bottom: 2rem; border-bottom: 1.5px solid var(--text); margin-bottom: 3rem; }
+.h-eyebrow { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: .6rem; }
+h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0; }
+.header-meta { font-family: var(--mono); font-size: 11px; color: var(--muted); line-height: 2.1; text-align: right; }
+.header-meta b { color: var(--text); font-weight: 500; }
+
+/* ── Section ── */
+.sec-header { display: flex; align-items: baseline; gap: 1rem; margin: 3rem 0 1.25rem; padding-bottom: .5rem; border-bottom: 0.5px solid var(--border); }
+.sec-num { font-family: var(--mono); font-size: 10px; color: var(--muted2); letter-spacing: .1em; }
+.sec-title { font-size: 1.1rem; font-weight: 600; letter-spacing: -.01em; }
+
+/* ── KPI row ── */
+.kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 2rem; }
+.kpi { background: var(--bg); padding: 1.1rem 1.25rem; }
+.kpi-label { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; margin-bottom: .4rem; }
+.kpi-value { font-size: 1.9rem; font-weight: 600; letter-spacing: -.02em; line-height: 1; }
+.kpi-sub { font-size: 11px; color: var(--muted); margin-top: .3rem; }
+.red { color: var(--red); }
+.green { color: var(--green); }
+.amber { color: var(--amber); }
+.blue { color: var(--blue); }
+.purple { color: var(--purple); }
+
+/* ── Cards ── */
+.card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.4rem 1.6rem; margin-bottom: 1rem; }
+.card-title { font-size: .95rem; font-weight: 600; margin-bottom: .25rem; }
+.card-desc { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 1.1rem; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+.chart-wrap { position: relative; }
+
+/* ── Legend ── */
+.legend { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: .75rem; }
+.li { display: flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: .03em; }
+.ld { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.ld-line { width: 16px; height: 2px; flex-shrink: 0; }
+
+/* ── Funnel ── */
+.funnel-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.fl { font-family: var(--mono); font-size: 10px; color: var(--muted); width: 24px; flex-shrink: 0; }
+.fb-wrap { flex: 1; height: 20px; background: var(--bg3); border-radius: 3px; overflow: hidden; position: relative; }
+.fb-reach { height: 100%; position: absolute; border-radius: 3px; }
+.fb-pass { height: 100%; position: absolute; border-radius: 3px; }
+.f-stats { width: 170px; flex-shrink: 0; display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
+.f-nums { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.f-pct { font-family: var(--mono); font-size: 11px; font-weight: 500; min-width: 34px; text-align: right; }
+/* ── Stars bar ── */
+.stars-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-family: var(--mono); font-size: 11px; }
+.stars-bar-wrap { flex: 1; height: 14px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
+.stars-bar-fill { height: 100%; border-radius: 2px; }
+.stars-count { width: 24px; text-align: right; color: var(--muted); }
+
+/* ── Session blocks ── */
+.session-stat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 1rem; }
+.ss { background: var(--bg); padding: 1rem 1.1rem; }
+.ss-label { font-family: var(--mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: .35rem; }
+.ss-val { font-size: 1.6rem; font-weight: 600; letter-spacing: -.02em; }
+.ss-sub { font-size: 11px; color: var(--muted); margin-top: .2rem; }
+
+/* ── Segments ── */
+.seg-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 1.5rem; }
+.seg-card { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.seg-head { padding: .8rem 1rem; border-bottom: 1px solid var(--border); }
+.seg-letter { font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; margin-bottom: .2rem; }
+.seg-name { font-size: .9rem; font-weight: 600; }
+.seg-n { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.seg-body { padding: .8rem 1rem; background: var(--bg2); }
+.seg-stat { display: flex; justify-content: space-between; align-items: baseline; padding: 3px 0; font-size: 12px; border-bottom: 0.5px solid var(--border); }
+.seg-stat:last-child { border-bottom: none; }
+.seg-stat-label { color: var(--muted); font-family: var(--mono); font-size: 10px; }
+.seg-stat-val { font-weight: 500; font-family: var(--mono); font-size: 11px; }
+.seg-journey { padding: .75rem 1rem; font-size: 11px; color: var(--muted); line-height: 1.55; border-top: 1px solid var(--border); }
+.seg-journey b { color: var(--text); font-weight: 500; }
+
+/* ── Findings ── */
+.findings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+.finding { border: 1px solid var(--border); border-radius: 8px; padding: 1.1rem 1.25rem; border-left-width: 3px; }
+.finding.red { border-left-color: var(--red); }
+.finding.amber { border-left-color: var(--amber); }
+.finding.green { border-left-color: var(--green); }
+.finding.purple { border-left-color: var(--purple); }
+.finding.blue { border-left-color: var(--blue); }
+.finding-title { font-size: .9rem; font-weight: 600; margin-bottom: .35rem; }
+.finding-body { font-size: 12px; color: var(--muted); line-height: 1.65; }
+.finding-body b { color: var(--text); font-weight: 500; }
+
+/* ── Footer ── */
+.footer { margin-top: 5rem; padding-top: 1.5rem; border-top: 1.5px solid var(--text); display: flex; justify-content: space-between; align-items: center; }
+.footer-l { font-family: var(--mono); font-size: 10px; color: var(--muted); line-height: 2; }
+.footer-r { font-size: 1.5rem; font-weight: 600; letter-spacing: -.02em; color: var(--border2); }
+
+@media(max-width:700px){
+  .kpi-row{grid-template-columns:1fr 1fr}.two-col,.three-col,.seg-grid,.findings-grid{grid-template-columns:1fr}
+  h1{font-size:2.2rem}.header{grid-template-columns:1fr}.header-meta{text-align:left}.session-stat-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- HEADER -->
+<div class="header">
+  <div>
+    <div class="h-eyebrow">Game Flow Report</div>
+    <h1>BRKER</h1>
+  </div>
+  <div class="header-meta">
+    <b>Period</b> May 20 – Jun 2, 2026<br>
+    <b>Duration</b> 14 days
+  </div>
+</div>
+
+<!-- KPIs -->
+<div class="kpi-row">
+  <div class="kpi"><div class="kpi-label">Total users</div><div class="kpi-value blue" id="kpi-users">110</div><div class="kpi-sub">unique players</div></div>
+  <div class="kpi"><div class="kpi-label">L1 pass rate</div><div class="kpi-value amber" id="kpi-l1">62%</div><div class="kpi-sub">68 of 110</div></div>
+  <div class="kpi"><div class="kpi-label">Reached L5+</div><div class="kpi-value green" id="kpi-l5">4</div><div class="kpi-sub">users past wall</div></div>
+  <div class="kpi"><div class="kpi-label">Biggest bottleneck</div><div class="kpi-value red" id="kpi-l4">L4</div><div class="kpi-sub" id="kpi-l4-sub">53% pass, 4.2 avg tries</div></div>
+  <div class="kpi"><div class="kpi-label">Returned</div><div class="kpi-value purple" id="kpi-ret">17%</div><div class="kpi-sub">19 of 110 users</div></div>
+</div>
+
+<!-- ── SECTION 01: FUNNEL ── -->
+<div class="sec-header"><span class="sec-num">01</span><span class="sec-title">Level funnel — reach & pass</span></div>
+
+<div class="card">
+  <div class="card-title">Users reached vs. passed each level</div>
+  <div class="card-desc">Light bar = users who attempted the level. Dark bar = users who cleared it.</div>
+  <div class="legend">
+    <div class="li"><div class="ld" style="background:#93c5fd;opacity:.7"></div>Reached</div>
+    <div class="li"><div class="ld" style="background:#16a34a"></div>Passed</div>
+  </div>
+  <div id="funnelEl"></div>
+</div>
+
+<!-- ── SECTION 02: SUCCESS RATE ── -->
+<div class="sec-header"><span class="sec-num">02</span><span class="sec-title">Success rate & avg attempts to pass</span></div>
+
+<div class="card">
+  <div class="card-title">Pass rate per level + avg tries before clearing</div>
+  <div class="card-desc">Bars = share of attempts that succeed. Line = avg tries needed to clear (passers only).</div>
+  <div class="legend">
+    <div class="li"><div class="ld" style="background:#16a34a"></div>Pass rate</div>
+    <div class="li"><div class="ld-line" style="background:#7c3aed"></div>Avg tries to pass</div>
+  </div>
+  <div class="chart-wrap" style="height:240px"><canvas id="successChart" role="img" aria-label="Pass rate and avg attempts to pass per level">Pass rate per level.</canvas></div>
+</div>
+
+<!-- ── SECTION 03: TIME + DROPOUT ── -->
+<div class="sec-header"><span class="sec-num">03</span><span class="sec-title">Play time & dropout distribution</span></div>
+
+<div class="two-col">
+  <div class="card">
+    <div class="card-title">Avg play time per level (seconds)</div>
+    <div class="card-desc">Shorter time on harder levels suggests early give-up, not quicker play.</div>
+    <div class="chart-wrap" style="height:210px"><canvas id="timeChart" role="img" aria-label="Average play time per level">Avg time per level.</canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Users dropped at each level</div>
+    <div class="card-desc">Tried but never passed — where players permanently stop.</div>
+    <div class="chart-wrap" style="height:210px"><canvas id="dropoutChart" role="img" aria-label="Dropout count per level">Dropout per level.</canvas></div>
+  </div>
+</div>
+
+<!-- ── SECTION 04: STARS ── -->
+<div class="sec-header"><span class="sec-num">04</span><span class="sec-title">Star ratings on successful attempts</span></div>
+
+<div class="two-col">
+  <div class="card">
+    <div class="card-title">Stars distribution per level (success only)</div>
+    <div class="card-desc">L2 shows 0 stars on all passes — likely a tracking issue.</div>
+    <div id="starsEl" style="margin-top:.25rem"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Avg stars per level</div>
+    <div class="card-desc">Overall quality stays consistent 2.1–2.7 across all levels where data is available.</div>
+    <div class="chart-wrap" style="height:210px"><canvas id="starsChart" role="img" aria-label="Average star rating per level">Avg stars per level.</canvas></div>
+  </div>
+</div>
+
+<!-- ── SECTION 05: SESSIONS ── -->
+<div class="sec-header"><span class="sec-num">05</span><span class="sec-title">Sessions & return behaviour</span></div>
+
+<div class="session-stat-grid">
+  <div class="ss"><div class="ss-label">Returned</div><div class="ss-val purple" id="ss-returned">19</div><div class="ss-sub">of 110 users (17%)</div></div>
+  <div class="ss"><div class="ss-label">Median return</div><div class="ss-val" id="ss-median">11.3h</div><div class="ss-sub">after first session</div></div>
+  <div class="ss"><div class="ss-label">Multi-session max level</div><div class="ss-val green" id="ss-multi-level">3.95</div><div class="ss-sub" id="ss-sub-multi">vs 1.60 single-session</div></div>
+  <div class="ss"><div class="ss-label">Max sessions</div><div class="ss-val">4</div><div class="ss-sub">one user, 3 others had 3</div></div>
+</div>
+
+<div class="two-col">
+  <div class="card">
+    <div class="card-title">Sessions per user</div>
+    <div class="card-desc">83% of users played a single session only.</div>
+    <div class="chart-wrap" style="height:190px"><canvas id="sessionsChart" role="img" aria-label="Session count distribution">Sessions distribution.</canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Return gap distribution (hours)</div>
+    <div class="card-desc">19 returning users. Half came back within 11h. One returned after 7 days.</div>
+    <div class="chart-wrap" style="height:190px"><canvas id="returnChart" role="img" aria-label="Return gap in hours for multi-session users">Return gap hours.</canvas></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">Daily activity — D0 to D12</div>
+  <div class="card-desc">Total attempts per day (bars) and new users joining (line).</div>
+  <div class="legend">
+    <div class="li"><div class="ld" style="background:#93c5fd"></div>Total attempts</div>
+    <div class="li"><div class="ld-line" style="background:#7c3aed"></div>New users</div>
+  </div>
+  <div class="chart-wrap" style="height:210px"><canvas id="dailyChart" role="img" aria-label="Daily attempts and new users over 14 days">Daily activity.</canvas></div>
+</div>
+
+<!-- ── SECTION 06: SEGMENTS ── -->
+<div class="sec-header"><span class="sec-num">06</span><span class="sec-title">User segments</span></div>
+
+<div class="seg-grid" id="segGrid"></div>
+
+<div class="card">
+  <div class="card-title">Typical journey — median attempts per level by segment</div>
+  <div class="card-desc">How many attempts each segment typically makes before moving on (or dropping). Only levels each segment reached are shown.</div>
+  <div class="legend" id="segLegend"></div>
+  <div class="chart-wrap" style="height:240px"><canvas id="segChart" role="img" aria-label="Median attempts per level by user segment">Segment journeys.</canvas></div>
+</div>
+
+<!-- ── SECTION 07: FINDINGS ── -->
+<div class="sec-header"><span class="sec-num">07</span><span class="sec-title">Key findings</span></div>
+
+<div class="findings-grid">
+  <div class="finding red">
+    <div class="finding-title">L1 cold start — 38% quit without passing</div>
+    <div class="finding-body"><b>25 users (23%) gave up after a single attempt.</b> 42 total never cleared L1. The drop is immediate — likely reflects unfamiliarity with VR dribbling mechanics rather than lack of motivation.</div>
+  </div>
+  <div class="finding red">
+    <div class="finding-title">L4 is the hardest wall in the game</div>
+    <div class="finding-body">Pass rate drops to <b>53%</b> with an average of <b>4.2 tries</b> to clear — nearly 3× more than L1–L3. One user attempted L4 <b>14 times</b> without success. Clear difficulty spike that cuts the active user base in half.</div>
+  </div>
+  <div class="finding amber">
+    <div class="finding-title">L2 star rating not tracked</div>
+    <div class="finding-body">All 33 successful L2 passes recorded <b>0 stars</b>. Every other level returns 1–3 stars on completion. Appears to be a <b>data tracking issue</b> rather than gameplay behaviour.</div>
+  </div>
+  <div class="finding amber">
+    <div class="finding-title">L9 difficulty spike — 33% pass rate</div>
+    <div class="finding-body">Only 1 of 3 users cleared L9 (33%), on a <b>2.0 avg tries</b>. Small sample, but mirrors the L4 pattern. Upper levels may follow an every-other-level difficulty structure worth validating.</div>
+  </div>
+  <div class="finding green">
+    <div class="finding-title">Within-session flow is strong</div>
+    <div class="finding-body">Median time between unlocking a level and attempting the next is <b>~1 minute</b> across L1–L4. Players who pass don't hesitate — internal drive between levels is working well.</div>
+  </div>
+  <div class="finding blue">
+    <div class="finding-title">Multi-session users go 2.5× further</div>
+    <div class="finding-body">Users who returned reached an average of <b>level 3.95</b> vs <b>1.60</b> for single-session players. The 17% who came back are meaningfully more engaged — and most returned within the same day (median 11.3h).</div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="footer-l">BRKER — Game Flow Report · May–Jun 2026 · 110 users</div>
+  <div class="footer-r">BRKER</div>
+</div>
+
+<!-- LIVE DATA BANNER -->
+<div id="liveBanner" style="position:fixed;bottom:1.5rem;right:1.5rem;background:#111114;color:#fff;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:.6rem 1rem;border-radius:6px;display:flex;align-items:center;gap:8px;z-index:999;box-shadow:0 2px 12px rgba(0,0,0,.15)">
+  <span id="liveDot" style="width:7px;height:7px;border-radius:50%;background:#d97706;flex-shrink:0"></span>
+  <span id="liveText">Loading live data…</span>
+  <button onclick="fetchLive()" style="margin-left:6px;background:none;border:1px solid rgba(255,255,255,.2);color:#fff;font-family:inherit;font-size:10px;padding:2px 7px;border-radius:3px;cursor:pointer">↻ Refresh</button>
+</div>
+
+</div><!-- /page -->
+
+<script>
+const tc = '#7a7a85';
+const gc = '#e4e4e8';
+const SHEETS_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQT5PD4JVg8l4P_EPMmE_VibHKvmxhcZeIjXmEjEMUD993fZ6iWbBhuRFCZg2TdoSQHpg91bfxqyo16/pub?gid=0&single=true&output=csv';
+
+// ── Static fallback data (last known) ──
+const STATIC = {
+  levels:['L1','L2','L3','L4','L5','L6','L7','L8','L9','L10','L11'],
+  reached:[110,47,25,17,4,4,4,3,3,1,1],
+  passed:[68,32,21,9,4,4,3,3,1,1,0],
+  successRate:[62,68,84,53,100,100,75,100,33,100,0],
+  attemptsToPass:[1.62,1.50,2.19,4.22,1.25,1.00,1.00,2.67,2.00,1.00,null],
+  avgTime:[45.2,41.5,33.8,31.7,42.8,40.8,32.8,36.5,20.0,48.6,19.1],
+  stuck:[42,15,4,8,0,0,1,0,2,0,1],
+  attemptsDay:[27,1,7,32,93,32,42,67,63,27,20,21,39],
+  newUsersDay:[5,1,5,8,19,11,13,10,13,7,6,7,5],
+  totalUsers:110,
+  returnedUsers:19,
+  starsAvg:[2.36,null,2.32,2.45,2.71,2.12,2.40,2.50,2.00,2.00,null],
+  starsData:{1:{1:10,2:27,3:36},2:null,3:{1:3,2:9,3:10},4:{2:6,3:5},5:{2:2,3:5},6:{1:1,2:5,3:2},7:{2:3,3:2},8:{2:3,3:3}}
+};
+
+// ── Parse CSV → compute all metrics ──
+function parseCSV(text) {
+  const lines = text.trim().split('\n').slice(1); // skip header
+  const rows = lines.map(l => {
+    const parts = l.split(',');
+    return {
+      user_id: parts[0]?.trim(),
+      email:   parts[1]?.trim(),
+      timestamp: parseFloat(parts[2]),
+      level:   parts[3]?.trim(),
+      success: parseInt(parts[4]),
+      stars:   parseInt(parts[5]),
+      time:    parseFloat(parts[6])
+    };
+  }).filter(r => r.user_id && !isNaN(r.timestamp));
+
+  // Sort by user + timestamp
+  rows.sort((a,b) => a.user_id.localeCompare(b.user_id) || a.timestamp - b.timestamp);
+
+  const levelNums = rows.map(r => parseInt((r.level.match(/\d+/)||[0])[0]));
+  const maxLevelNum = Math.max(...levelNums);
+  const levels = Array.from({length: maxLevelNum}, (_,i) => 'L'+(i+1));
+
+  const users = [...new Set(rows.map(r=>r.user_id))];
+  const totalUsers = users.length;
+
+  // Launch day
+  const minTs = Math.min(...rows.map(r=>r.timestamp));
+  const maxDay = Math.max(...rows.map(r => Math.floor((r.timestamp - minTs)/86400)));
+
+  // Session detection
+  const userRows = {};
+  rows.forEach((r,i) => {
+    if(!userRows[r.user_id]) userRows[r.user_id] = [];
+    userRows[r.user_id].push({...r, levelNum: levelNums[i]});
+  });
+
+  let sessionsPerUser = {};
+  Object.entries(userRows).forEach(([uid, urows]) => {
+    let sess = 1;
+    for(let i=1;i<urows.length;i++){
+      if((urows[i].timestamp - urows[i-1].timestamp) > 1800) sess++;
+    }
+    sessionsPerUser[uid] = sess;
+  });
+
+  const returnedUsers = Object.values(sessionsPerUser).filter(s=>s>1).length;
+  const sessionsDist = [1,2,3,4].map(n => Object.values(sessionsPerUser).filter(s=>s===n).length);
+
+  // Return gaps
+  const returnGaps = [];
+  Object.entries(userRows).forEach(([uid, urows]) => {
+    if(sessionsPerUser[uid] < 2) return;
+    let s1end = null, s2start = null, inS1 = true;
+    for(let i=0;i<urows.length;i++){
+      if(i>0 && (urows[i].timestamp-urows[i-1].timestamp)>1800 && inS1){
+        s1end = urows[i-1].timestamp;
+        s2start = urows[i].timestamp;
+        inS1 = false;
+        break;
+      }
+    }
+    if(s1end && s2start) returnGaps.push((s2start-s1end)/3600);
+  });
+  const medianReturn = returnGaps.length ? returnGaps.slice().sort((a,b)=>a-b)[Math.floor(returnGaps.length/2)] : 0;
+
+  // Per-level stats
+  const reached=[], passed=[], successRate=[], attemptsToPass=[], avgTime=[], stuck=[];
+  for(let l=1;l<=maxLevelNum;l++){
+    const lrows = rows.filter((_,i)=>levelNums[i]===l);
+    const lUsers = [...new Set(lrows.map(r=>r.user_id))];
+    const pUsers = [...new Set(lrows.filter(r=>r.success===1).map(r=>r.user_id))];
+    reached.push(lUsers.length);
+    passed.push(pUsers.length);
+    successRate.push(lUsers.length ? Math.round(pUsers.length/lUsers.length*100) : 0);
+    stuck.push(lUsers.length - pUsers.length);
+
+    // avg time
+    const times = lrows.map(r=>r.time).filter(t=>!isNaN(t));
+    avgTime.push(times.length ? Math.round(times.reduce((a,b)=>a+b,0)/times.length*10)/10 : null);
+
+    // avg attempts to pass
+    let attArr = [];
+    lUsers.forEach(uid => {
+      const uRows = lrows.filter(r=>r.user_id===uid).sort((a,b)=>a.timestamp-b.timestamp);
+      const fi = uRows.findIndex(r=>r.success===1);
+      if(fi>=0) attArr.push(fi+1);
+    });
+    attemptsToPass.push(attArr.length ? Math.round(attArr.reduce((a,b)=>a+b,0)/attArr.length*100)/100 : null);
+  }
+
+  // Daily
+  const attemptsDay=[], newUsersDay=[];
+  const userFirstDay = {};
+  Object.entries(userRows).forEach(([uid,urows])=>{
+    userFirstDay[uid] = Math.floor((urows[0].timestamp - minTs)/86400);
+  });
+  for(let d=0;d<=maxDay;d++){
+    attemptsDay.push(rows.filter(r=>Math.floor((r.timestamp-minTs)/86400)===d).length);
+    newUsersDay.push(Object.values(userFirstDay).filter(fd=>fd===d).length);
+  }
+
+  // Stars
+  const starsAvg = [], starsData = {};
+  for(let l=1;l<=maxLevelNum;l++){
+    const sRows = rows.filter((r,i)=>levelNums[i]===l && r.success===1 && r.stars>0);
+    starsAvg.push(sRows.length ? Math.round(sRows.reduce((a,r)=>a+r.stars,0)/sRows.length*100)/100 : null);
+    const dist = {};
+    rows.filter((r,i)=>levelNums[i]===l && r.success===1 && r.stars>0).forEach(r=>{
+      dist[r.stars] = (dist[r.stars]||0)+1;
+    });
+    starsData[l] = Object.keys(dist).length ? dist : null;
+  }
+
+  // Multi-session max level
+  const multiUsers = Object.entries(sessionsPerUser).filter(([_,s])=>s>1).map(([u])=>u);
+  const singleUsers = Object.entries(sessionsPerUser).filter(([_,s])=>s===1).map(([u])=>u);
+  const avgMaxLevelMulti = multiUsers.length ? multiUsers.reduce((a,u)=>{
+    return a + Math.max(...userRows[u].map(r=>parseInt((r.level.match(/\d+/)||[0])[0])));
+  },0)/multiUsers.length : 0;
+  const avgMaxLevelSingle = singleUsers.length ? singleUsers.reduce((a,u)=>{
+    return a + Math.max(...userRows[u].map(r=>parseInt((r.level.match(/\d+/)||[0])[0])));
+  },0)/singleUsers.length : 0;
+
+  return {
+    levels, reached, passed, successRate, attemptsToPass, avgTime, stuck,
+    attemptsDay, newUsersDay, totalUsers, returnedUsers, sessionsDist,
+    returnGaps, medianReturn, starsAvg, starsData,
+    avgMaxLevelMulti: Math.round(avgMaxLevelMulti*100)/100,
+    avgMaxLevelSingle: Math.round(avgMaxLevelSingle*100)/100,
+    maxDay
+  };
+}
+
+// ── Chart instances (so we can destroy/rebuild) ──
+let charts = {};
+function destroyChart(id) { if(charts[id]){ charts[id].destroy(); delete charts[id]; } }
+
+// ── Render everything ──
+function render(d) {
+  // KPIs
+  document.getElementById('kpi-users').textContent = d.totalUsers;
+  const l1pr = d.successRate[0]||0;
+  document.getElementById('kpi-l1').textContent = l1pr+'%';
+  const l5plus = d.reached[4]||0;
+  document.getElementById('kpi-l5').textContent = l5plus;
+  const l4sr = d.successRate[3]||0;
+  document.getElementById('kpi-l4').textContent = 'L4';
+  document.getElementById('kpi-l4-sub').textContent = l4sr+'% pass, '+(d.attemptsToPass[3]||'?')+' avg tries';
+  document.getElementById('kpi-ret').textContent = Math.round(d.returnedUsers/d.totalUsers*100)+'%';
+
+  // Funnel
+  const funnelEl = document.getElementById('funnelEl');
+  funnelEl.innerHTML = '';
+  const maxR = d.reached[0]||1;
+  d.levels.forEach((lbl,i) => {
+    const rp = (d.reached[i]/maxR*100).toFixed(1);
+    const pp = (d.passed[i]/maxR*100).toFixed(1);
+    const sr = d.successRate[i];
+    const col = sr>=70?'#16a34a':sr>=50?'#d97706':'#dc2626';
+    const isBot = sr<55 && d.reached[i]>=10;
+    const isWat = sr<70 && sr>=55 && d.reached[i]>=4;
+    const row = document.createElement('div');
+    row.className='funnel-row';
+    row.innerHTML=`<span class="fl">${lbl}</span>
+      <div class="fb-wrap"><div class="fb-reach" style="width:${rp}%;background:#bfdbfe;"></div><div class="fb-pass" style="width:${pp}%;background:#16a34a;opacity:.8"></div></div>
+      <div class="f-stats"><span class="f-nums">${d.reached[i]} → ${d.passed[i]}</span><span class="f-pct" style="color:${col}">${sr}%</span>
+      <span style="width:22px;text-align:center;font-size:13px">${isBot?'🚨':isWat?'⚠️':''}</span></div>`;
+    funnelEl.appendChild(row);
+  });
+
+  // Success chart
+  destroyChart('successChart');
+  charts['successChart'] = new Chart(document.getElementById('successChart'), {
+    data:{ labels:d.levels, datasets:[
+      {type:'bar',label:'Pass rate (%)',data:d.successRate,backgroundColor:d.successRate.map(v=>v<55?'rgba(220,38,38,.75)':v<75?'rgba(217,119,6,.75)':'rgba(22,163,74,.75)'),borderRadius:3,yAxisID:'y'},
+      {type:'line',label:'Avg tries',data:d.attemptsToPass,borderColor:'#7c3aed',borderWidth:2,pointBackgroundColor:'#7c3aed',pointRadius:4,tension:.3,yAxisID:'y2',spanGaps:false}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:gc},ticks:{color:tc}},y:{grid:{color:gc},ticks:{color:tc,callback:v=>v+'%'},min:0,max:115},
+        y2:{position:'right',grid:{display:false},ticks:{color:'#7c3aed'},title:{display:true,text:'avg tries',color:'#7c3aed',font:{size:10}},min:0,max:6}}}
+  });
+
+  // Time chart
+  destroyChart('timeChart');
+  charts['timeChart'] = new Chart(document.getElementById('timeChart'), {
+    type:'bar',data:{labels:d.levels,datasets:[{label:'Avg time (s)',data:d.avgTime,backgroundColor:'rgba(59,130,246,.55)',borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:gc},ticks:{color:tc}},y:{grid:{color:gc},ticks:{color:tc,callback:v=>v+'s'},min:0}}}
+  });
+
+  // Dropout chart
+  destroyChart('dropoutChart');
+  charts['dropoutChart'] = new Chart(document.getElementById('dropoutChart'), {
+    type:'bar',data:{labels:d.levels,datasets:[{label:'Dropped',data:d.stuck,backgroundColor:d.stuck.map(v=>v>=15?'rgba(220,38,38,.75)':v>=4?'rgba(217,119,6,.7)':'rgba(180,180,190,.5)'),borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:gc},ticks:{color:tc}},y:{grid:{color:gc},ticks:{color:tc},min:0}}}
+  });
+
+  // Stars
+  const starsEl = document.getElementById('starsEl');
+  starsEl.innerHTML='';
+  for(let l=1;l<=Math.min(8,d.levels.length);l++){
+    const sd = d.starsData[l];
+    const total = sd?Object.values(sd).reduce((a,b)=>a+b,0):0;
+    const lrow=document.createElement('div');
+    lrow.style.cssText='margin-bottom:8px;';
+    if(!sd){
+      lrow.innerHTML=`<div style="display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--muted2)"><span style="width:20px">L${l}</span><span style="font-style:italic">no star data (bug)</span></div>`;
+    } else {
+      const bars=[1,2,3].map(s=>{
+        const n=sd[s]||0, pct=total>0?(n/total*100).toFixed(0):0;
+        const col=s===3?'#16a34a':s===2?'#3b82f6':'#94a3b8';
+        return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px"><span style="font-family:var(--mono);font-size:10px;color:var(--muted);width:14px">${s}★</span><div style="flex:1;height:11px;background:var(--bg3);border-radius:2px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${col};border-radius:2px"></div></div><span style="font-family:var(--mono);font-size:10px;color:var(--muted);width:20px;text-align:right">${n}</span></div>`;
+      }).join('');
+      lrow.innerHTML=`<div style="display:flex;gap:10px;align-items:flex-start"><span style="font-family:var(--mono);font-size:11px;font-weight:500;width:24px;padding-top:2px">L${l}</span><div style="flex:1">${bars}</div></div>`;
+    }
+    starsEl.appendChild(lrow);
+  }
+
+  destroyChart('starsChart');
+  charts['starsChart'] = new Chart(document.getElementById('starsChart'), {
+    type:'bar',data:{labels:d.levels,datasets:[{label:'Avg stars',data:d.starsAvg,backgroundColor:'rgba(234,179,8,.65)',borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:gc},ticks:{color:tc}},y:{grid:{color:gc},ticks:{color:tc},min:0,max:3.5,title:{display:true,text:'avg stars',color:tc,font:{size:10}}}}}
+  });
+
+  // Session KPIs
+  document.getElementById('ss-returned').textContent = d.returnedUsers;
+  document.getElementById('ss-median').textContent = d.medianReturn.toFixed(1)+'h';
+  document.getElementById('ss-multi-level').textContent = d.avgMaxLevelMulti.toFixed(2);
+  document.getElementById('ss-sub-multi').textContent = 'vs '+d.avgMaxLevelSingle.toFixed(2)+' single-session';
+
+  destroyChart('sessionsChart');
+  charts['sessionsChart'] = new Chart(document.getElementById('sessionsChart'), {
+    type:'bar',data:{labels:['1 session','2 sessions','3 sessions','4 sessions'],datasets:[{label:'Users',data:d.sessionsDist,backgroundColor:['rgba(59,130,246,.5)','rgba(124,58,237,.5)','rgba(124,58,237,.75)','rgba(124,58,237,1)'],borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:gc},ticks:{color:tc}},y:{grid:{color:gc},ticks:{color:tc}}}}
+  });
+
+  const gapBuckets=['<2h','2–8h','8–24h','1–3 days','3+ days'];
+  const gapCounts=[d.returnGaps.filter(g=>g<2).length,d.returnGaps.filter(g=>g>=2&&g<8).length,d.returnGaps.filter(g=>g>=8&&g<24).length,d.returnGaps.filter(g=>g>=24&&g<72).length,d.returnGaps.filter(g=>g>=72).length];
+  destroyChart('returnChart');
+  charts['returnChart'] = new Chart(document.getElementById('returnChart'), {
+    type:'bar',data:{labels:gapBuckets,datasets:[{label:'Users',data:gapCounts,backgroundColor:'rgba(124,58,237,.55)',borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:11}}},y:{grid:{color:gc},ticks:{color:tc},min:0}}}
+  });
+
+  const dayLabels = d.attemptsDay.map((_,i)=>'D'+i);
+  destroyChart('dailyChart');
+  charts['dailyChart'] = new Chart(document.getElementById('dailyChart'), {
+    data:{labels:dayLabels,datasets:[
+      {type:'bar',label:'Attempts',data:d.attemptsDay,backgroundColor:'rgba(147,197,253,.7)',borderRadius:3,yAxisID:'y'},
+      {type:'line',label:'New users',data:d.newUsersDay,borderColor:'#7c3aed',borderWidth:2,pointBackgroundColor:'#7c3aed',pointRadius:4,tension:.3,yAxisID:'y2'}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:gc},ticks:{color:tc}},y:{grid:{color:gc},ticks:{color:tc},title:{display:true,text:'attempts',color:tc,font:{size:10}}},
+        y2:{position:'right',grid:{display:false},ticks:{color:'#7c3aed'},title:{display:true,text:'new users',color:'#7c3aed',font:{size:10}},min:0}}}
+  });
+}
+
+// ── Static segments (not recalculated live — segment logic is complex) ──
+function renderStaticSegments() {
+  const segs = [
+    { id:'A', name:'Quick Starters', n:14, pct:'13%', color:'#16a34a',
+      stats:{ 'Avg max level':'5.4', 'Avg attempts':'14.1', 'Avg sessions':'1.7', 'L1 tries to pass':'1.0' },
+      journey:'<b>Pass L1 first try</b> → breeze through L2–L3 → grind L4 (3 tries) → continue deep into game.' },
+    { id:'B', name:'Grinders', n:3, pct:'3%', color:'#2563eb',
+      stats:{ 'Avg max level':'4.0', 'Avg attempts':'12.7', 'Avg sessions':'2.3', 'L1 tries to pass':'4.0' },
+      journey:'<b>Struggle on L1</b> (avg 4 tries) → persist through L2–L3 → reach L4, then drop. Most sessions of any group.' },
+    { id:'C', name:'Early Explorers', n:51, pct:'46%', color:'#d97706',
+      stats:{ 'Avg max level':'1.8', 'Avg attempts':'3.2', 'Avg sessions':'1.1', 'L1 tries to pass':'1.7' },
+      journey:'Pass L1, attempt L2–L3, then <b>stop progressing</b>. Low total attempts — disengage quickly after early levels.' },
+    { id:'D', name:'Cold Wall', n:42, pct:'38%', color:'#dc2626',
+      stats:{ 'Avg max level':'1.0', 'Avg attempts':'1.7', 'Avg sessions':'1.1', 'L1 tries to pass':'—' },
+      journey:'<b>Never pass L1.</b> Avg 1.7 attempts total — 25 gave up after a single try. Earliest and largest drop-off point.' },
+  ];
+  const segGrid = document.getElementById('segGrid');
+  segGrid.innerHTML='';
+  segs.forEach(s => {
+    const statsHtml = Object.entries(s.stats).map(([k,v])=>`<div class="seg-stat"><span class="seg-stat-label">${k}</span><span class="seg-stat-val">${v}</span></div>`).join('');
+    const el = document.createElement('div');
+    el.className='seg-card';
+    el.innerHTML=`<div class="seg-head" style="border-top:3px solid ${s.color}"><div class="seg-letter" style="color:${s.color}">Segment ${s.id}</div><div class="seg-name">${s.name}</div><div class="seg-n">${s.n} users &middot; ${s.pct}</div></div><div class="seg-body">${statsHtml}</div><div class="seg-journey">${s.journey}</div>`;
+    segGrid.appendChild(el);
+  });
+
+  const segJourneys={A:{1:1,2:1,3:3,4:3,5:2,6:2,7:2,8:1,9:5,10:2,11:2},B:{1:5,2:2,3:1,4:3},C:{1:1,2:1,3:2},D:{1:1}};
+  const levels=['L1','L2','L3','L4','L5','L6','L7','L8','L9','L10','L11'];
+  const segColors={A:'#16a34a',B:'#2563eb',C:'#d97706',D:'#dc2626'};
+  const segLegend=document.getElementById('segLegend');
+  segLegend.innerHTML='';
+  segs.forEach(s=>{const li=document.createElement('div');li.className='li';li.innerHTML=`<div class="ld" style="background:${s.color}"></div>${s.id} — ${s.name}`;segLegend.appendChild(li);});
+
+  destroyChart('segChart');
+  charts['segChart'] = new Chart(document.getElementById('segChart'), {
+    type:'line',
+    data:{labels:levels,datasets:segs.map(s=>({label:s.name,data:levels.map((_,i)=>segJourneys[s.id][i+1]||null),borderColor:s.color,backgroundColor:s.color+'22',borderWidth:2,pointBackgroundColor:s.color,pointRadius:5,tension:.3,spanGaps:false}))},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:gc},ticks:{color:tc}},y:{grid:{color:gc},ticks:{color:tc},title:{display:true,text:'median attempts',color:tc,font:{size:10}},min:0,max:7}}}
+  });
+}
+
+// ── Fetch live data ──
+async function fetchLive() {
+  const dot = document.getElementById('liveDot');
+  const txt = document.getElementById('liveText');
+  dot.style.background = '#d97706';
+  txt.textContent = 'Fetching…';
+  try {
+    const res = await fetch(SHEETS_URL);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const csv = await res.text();
+    const d = parseCSV(csv);
+    render(d);
+    dot.style.background = '#16a34a';
+    txt.textContent = 'Live · updated '+new Date().toLocaleTimeString();
+  } catch(e) {
+    dot.style.background = '#dc2626';
+    txt.textContent = 'Offline — showing cached data';
+    render(STATIC);
+  }
+}
+
+// ── Init ──
+render(STATIC);          // show immediately
+renderStaticSegments();
+fetchLive();              // then try live
+</script>
+</body>
+</html>
