@@ -216,9 +216,12 @@ h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0
   <div class="card-title">Failed attempts — time distribution per level</div>
   <div class="card-desc">How long players spend on unsuccessful attempts, grouped by level. Reveals whether players give up early or play to the time limit.</div>
   <div class="legend">
-    <div class="li"><div class="ld" style="background:rgba(59,130,246,.7)"></div>0–20s</div>
-    <div class="li"><div class="ld" style="background:rgba(217,119,6,.7)"></div>20–40s</div>
-    <div class="li"><div class="ld" style="background:rgba(220,38,38,.7)"></div>40–50s</div>
+    <div class="li"><div class="ld" style="background:rgba(59,130,246,.75)"></div>&lt;20s</div>
+    <div class="li"><div class="ld" style="background:rgba(14,165,233,.75)"></div>20–40s</div>
+    <div class="li"><div class="ld" style="background:rgba(217,119,6,.75)"></div>40–44s</div>
+    <div class="li"><div class="ld" style="background:rgba(234,88,12,.85)"></div>45s</div>
+    <div class="li"><div class="ld" style="background:rgba(239,68,68,.7)"></div>45–49s</div>
+    <div class="li"><div class="ld" style="background:rgba(185,28,28,.85)"></div>50s</div>
   </div>
   <div class="chart-wrap" style="height:240px"><canvas id="failTimeChart" role="img" aria-label="Failed attempts time distribution per level">Failed time distribution.</canvas></div>
 </div>
@@ -359,9 +362,12 @@ const STATIC = {
   avgMaxLevelMulti:3.95,
   avgMaxLevelSingle:1.60,
   failTime:{
-    s0_20: [5,1,7,6,0,0,2,2,10,0,1],
-    s20_40:[3,13,15,48,0,0,0,0,2,0,1],
-    s40_50:[109,42,13,14,4,0,1,3,1,1,0]
+    b0_20:  [5,  1,  7,  6,  0, 0, 2, 2, 10, 0, 1],
+    b20_40: [3, 13, 15, 48,  0, 0, 0, 0,  2, 0, 1],
+    b40_44: [5,  4,  3,  3,  0, 0, 1, 0,  0, 0, 0],
+    b45:    [0, 38, 10, 11,  4, 0, 0, 3,  0, 0, 0],
+    b45_49: [0,  0,  0,  0,  0, 0, 0, 0,  1, 0, 0],
+    b50:    [104, 0,  0,  0,  0, 0, 0, 0,  0, 1, 0]
   }
 };
 
@@ -489,13 +495,17 @@ function parseCSV(text, forcedLaunchTs) {
     return a + Math.max(...userRows[u].map(r=>parseInt((r.level.match(/\d+/)||[0])[0])));
   },0)/singleUsers.length : 0;
 
-  // Failed attempts time distribution
-  const failTime = { s0_20:[], s20_40:[], s40_50:[] };
+  // Failed attempts time distribution — 6 buckets
+  // 45s cluster = 44.9–45.2, 50s cluster = 49.9–50.2 (float precision around time limits)
+  const failTime = { b0_20:[], b20_40:[], b40_44:[], b45:[], b45_49:[], b50:[] };
   for(let l=1;l<=maxLevelNum;l++){
     const lf = rows.filter((r,i)=>levelNums[i]===l && r.success===0);
-    failTime.s0_20.push( lf.filter(r=>r.time>=0  && r.time<20).length);
-    failTime.s20_40.push(lf.filter(r=>r.time>=20 && r.time<40).length);
-    failTime.s40_50.push(lf.filter(r=>r.time>=40).length);
+    failTime.b0_20.push(  lf.filter(r=>r.time < 20).length);
+    failTime.b20_40.push( lf.filter(r=>r.time >= 20  && r.time < 40).length);
+    failTime.b40_44.push( lf.filter(r=>r.time >= 40  && r.time < 44.9).length);
+    failTime.b45.push(    lf.filter(r=>r.time >= 44.9 && r.time <= 45.2).length);
+    failTime.b45_49.push( lf.filter(r=>r.time > 45.2 && r.time < 49.9).length);
+    failTime.b50.push(    lf.filter(r=>r.time >= 49.9).length);
   }
 
   return {
@@ -633,17 +643,17 @@ function render(d) {
     type:'bar',
     data:{ labels: d.levels,
       datasets:[
-        { label:'0–20s',  data: d.failTime.s0_20,  backgroundColor:'rgba(59,130,246,.7)',  borderRadius:3, stack:'t' },
-        { label:'20–40s', data: d.failTime.s20_40, backgroundColor:'rgba(217,119,6,.7)',   borderRadius:3, stack:'t' },
-        { label:'40–50s', data: d.failTime.s40_50, backgroundColor:'rgba(220,38,38,.7)',   borderRadius:3, stack:'t' }
+        { label:'<20s',   data: d.failTime.b0_20,  backgroundColor:'rgba(59,130,246,.75)',  borderRadius:3, stack:'t' },
+        { label:'20–40s', data: d.failTime.b20_40, backgroundColor:'rgba(14,165,233,.75)',  borderRadius:3, stack:'t' },
+        { label:'40–44s', data: d.failTime.b40_44, backgroundColor:'rgba(217,119,6,.75)',   borderRadius:3, stack:'t' },
+        { label:'45s',    data: d.failTime.b45,    backgroundColor:'rgba(234,88,12,.85)',   borderRadius:3, stack:'t' },
+        { label:'45–49s', data: d.failTime.b45_49, backgroundColor:'rgba(239,68,68,.7)',    borderRadius:3, stack:'t' },
+        { label:'50s',    data: d.failTime.b50,    backgroundColor:'rgba(185,28,28,.85)',   borderRadius:3, stack:'t' }
       ]
     },
     options:{ responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{ display:false },
-        tooltip:{ callbacks:{ footer: items => {
-          const total = items.reduce((s,i)=>s+i.raw,0);
-          return 'Total failed: '+total;
-        }}}
+        tooltip:{ callbacks:{ footer: items => 'Total failed: '+items.reduce((s,i)=>s+i.raw,0) }}
       },
       scales:{
         x:{ grid:{color:gc}, ticks:{color:tc}, stacked:true },
