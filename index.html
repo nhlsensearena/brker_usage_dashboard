@@ -140,9 +140,25 @@ h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0
     <h1>BRKER</h1>
   </div>
   <div class="header-meta">
-    <b>Period</b> May 20 – Jun 2, 2026<br>
-    <b>Duration</b> 14 days
+    <b>Period</b> <span id="hdr-period">—</span><br>
+    <b>Users</b> <span id="hdr-users">—</span>
   </div>
+</div>
+
+<!-- DATE FILTER -->
+<div id="filterBar" style="display:flex;align-items:center;gap:12px;margin-bottom:2rem;padding:.85rem 1.25rem;background:#f7f7f8;border:1px solid #e4e4e8;border-radius:8px;flex-wrap:wrap">
+  <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7a7a85;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap">Date range</span>
+  <div style="display:flex;align-items:center;gap:8px">
+    <label style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7a7a85">From</label>
+    <input type="date" id="filterFrom" style="font-family:'IBM Plex Mono',monospace;font-size:11px;padding:4px 8px;border:1px solid #d0d0d6;border-radius:4px;background:#fff;color:#111114;outline:none;cursor:pointer">
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <label style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7a7a85">To</label>
+    <input type="date" id="filterTo" style="font-family:'IBM Plex Mono',monospace;font-size:11px;padding:4px 8px;border:1px solid #d0d0d6;border-radius:4px;background:#fff;color:#111114;outline:none;cursor:pointer">
+  </div>
+  <button onclick="applyFilter()" style="font-family:'IBM Plex Mono',monospace;font-size:10px;padding:5px 14px;background:#111114;color:#fff;border:none;border-radius:4px;cursor:pointer;letter-spacing:.05em">Apply</button>
+  <button onclick="resetFilter()" style="font-family:'IBM Plex Mono',monospace;font-size:10px;padding:5px 14px;background:none;color:#7a7a85;border:1px solid #d0d0d6;border-radius:4px;cursor:pointer">Reset</button>
+  <span id="filterInfo" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7a7a85;margin-left:4px"></span>
 </div>
 
 <!-- KPIs -->
@@ -316,7 +332,10 @@ h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0
 <script>
 const tc = '#7a7a85';
 const gc = '#e4e4e8';
-const SHEETS_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQT5PD4JVg8l4P_EPMmE_VibHKvmxhcZeIjXmEjEMUD993fZ6iWbBhuRFCZg2TdoSQHpg91bfxqyo16/pub?gid=0&single=true&output=csv';
+const SHEETS_URL = 'https://docs.google.com/spreadsheets/d/13oOqwhJsRrE06YhcnYHtQvNu9SHsDCbCMTWtP2wnkBs/pub?gid=0&single=true&output=csv';
+
+// ── Raw CSV rows — stored after fetch for filter re-use ──
+let RAW_CSV = null;
 
 // ── Static fallback data (last known) ──
 const STATIC = {
@@ -484,7 +503,7 @@ function parseCSV(text) {
     returnGaps, medianReturn, starsAvg, starsData,
     avgMaxLevelMulti: Math.round(avgMaxLevelMulti*100)/100,
     avgMaxLevelSingle: Math.round(avgMaxLevelSingle*100)/100,
-    maxDay, failTime
+    maxDay, failTime, _launchTs: minTs
   };
 }
 
@@ -494,7 +513,13 @@ function destroyChart(id) { if(charts[id]){ charts[id].destroy(); delete charts[
 
 // ── Render everything ──
 function render(d) {
-  // KPIs
+  // Header meta
+  if(d.attemptsDay && d.attemptsDay.length > 0 && d._launchTs) {
+    const from = new Date(d._launchTs*1000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    const to   = new Date((d._launchTs + (d.attemptsDay.length-1)*86400)*1000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    document.getElementById('hdr-period').textContent = from + ' – ' + to;
+  }
+  document.getElementById('hdr-users').textContent = d.totalUsers + ' users';
   document.getElementById('kpi-users').textContent = d.totalUsers;
   const l1pr = d.successRate[0]||0;
   document.getElementById('kpi-l1').textContent = l1pr+'%';
@@ -697,21 +722,87 @@ async function fetchLive() {
     const res = await fetch(SHEETS_URL);
     if(!res.ok) throw new Error('HTTP '+res.status);
     const csv = await res.text();
+    RAW_CSV = csv;
     const d = parseCSV(csv);
-    render(d);
+    // Set filter defaults to full range on first load
+    if(!document.getElementById('filterFrom').value) {
+      const from = new Date(d._launchTs*1000);
+      const to   = new Date((d._launchTs + d.maxDay*86400)*1000);
+      document.getElementById('filterFrom').value = isoDate(from);
+      document.getElementById('filterTo').value   = isoDate(to);
+    }
+    applyFilterToData(d);
     dot.style.background = '#16a34a';
-    txt.textContent = 'Live · updated '+new Date().toLocaleTimeString();
+    txt.textContent = 'Live · ' + new Date().toLocaleTimeString();
   } catch(e) {
     dot.style.background = '#dc2626';
-    txt.textContent = 'Offline — showing cached data';
+    txt.textContent = 'Offline — cached data';
     render(STATIC);
+    renderStaticSegments();
   }
 }
 
+function isoDate(d) {
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+function applyFilter() {
+  if(!RAW_CSV) { render(STATIC); renderStaticSegments(); return; }
+  applyFilterToData(parseCSV(RAW_CSV));
+}
+
+function resetFilter() {
+  document.getElementById('filterFrom').value = '';
+  document.getElementById('filterTo').value   = '';
+  document.getElementById('filterInfo').textContent = '';
+  if(RAW_CSV) {
+    const d = parseCSV(RAW_CSV);
+    document.getElementById('filterFrom').value = isoDate(new Date(d._launchTs*1000));
+    document.getElementById('filterTo').value   = isoDate(new Date((d._launchTs+d.maxDay*86400)*1000));
+    applyFilterToData(d);
+  }
+}
+
+function applyFilterToData(fullData) {
+  const fromVal = document.getElementById('filterFrom').value;
+  const toVal   = document.getElementById('filterTo').value;
+
+  if(!fromVal || !toVal || !RAW_CSV) {
+    render(fullData);
+    renderStaticSegments();
+    return;
+  }
+
+  const fromTs = new Date(fromVal+'T00:00:00').getTime()/1000;
+  const toTs   = new Date(toVal+'T23:59:59').getTime()/1000;
+
+  // Filter CSV lines by timestamp
+  const lines  = RAW_CSV.trim().split('\n');
+  const header = lines[0];
+  const filtered = lines.slice(1).filter(line => {
+    const parts = line.split(',');
+    const ts = parseFloat(parts[2]);
+    return ts >= fromTs && ts <= toTs;
+  });
+
+  const filteredCSV = [header, ...filtered].join('\n');
+  const d = parseCSV(filteredCSV);
+
+  // Show filter info
+  const info = document.getElementById('filterInfo');
+  info.textContent = filtered.length + ' attempts · ' + d.totalUsers + ' users in range';
+
+  render(d);
+  renderStaticSegments();
+}
+
 // ── Init ──
-render(STATIC);          // show immediately
+render(STATIC);
 renderStaticSegments();
-fetchLive();              // then try live
+fetchLive();
+
+// ── Auto-refresh every 5 minutes ──
+setInterval(fetchLive, 5 * 60 * 1000);
 </script>
 </body>
 </html>
