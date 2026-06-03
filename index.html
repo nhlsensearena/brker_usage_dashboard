@@ -332,10 +332,11 @@ h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0
 <script>
 const tc = '#7a7a85';
 const gc = '#e4e4e8';
-const SHEETS_URL = 'https://docs.google.com/spreadsheets/d/13oOqwhJsRrE06YhcnYHtQvNu9SHsDCbCMTWtP2wnkBs/pub?gid=0&single=true&output=csv';
+const SHEETS_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQT5PD4JVg8l4P_EPMmE_VibHKvmxhcZeIjXmEjEMUD993fZ6iWbBhuRFCZg2TdoSQHpg91bfxqyo16/pub?gid=0&single=true&output=csv';
 
 // ── Raw CSV rows — stored after fetch for filter re-use ──
 let RAW_CSV = null;
+let GLOBAL_LAUNCH_TS = null; // earliest timestamp across ALL data, never changes with filter
 
 // ── Static fallback data (last known) ──
 const STATIC = {
@@ -365,7 +366,7 @@ const STATIC = {
 };
 
 // ── Parse CSV → compute all metrics ──
-function parseCSV(text) {
+function parseCSV(text, forcedLaunchTs) {
   const lines = text.trim().split('\n').slice(1); // skip header
   const rows = lines.map(l => {
     const parts = l.split(',');
@@ -390,8 +391,8 @@ function parseCSV(text) {
   const users = [...new Set(rows.map(r=>r.user_id))];
   const totalUsers = users.length;
 
-  // Launch day
-  const minTs = Math.min(...rows.map(r=>r.timestamp));
+  // Launch day — use forced (global) launch if filtering, else use data minimum
+  const minTs = forcedLaunchTs || Math.min(...rows.map(r=>r.timestamp));
   const maxDay = Math.max(...rows.map(r => Math.floor((r.timestamp - minTs)/86400)));
 
   // Session detection
@@ -723,15 +724,20 @@ async function fetchLive() {
     if(!res.ok) throw new Error('HTTP '+res.status);
     const csv = await res.text();
     RAW_CSV = csv;
-    const d = parseCSV(csv);
-    // Set filter defaults to full range on first load
-    if(!document.getElementById('filterFrom').value) {
-      const from = new Date(d._launchTs*1000);
-      const to   = new Date((d._launchTs + d.maxDay*86400)*1000);
-      document.getElementById('filterFrom').value = isoDate(from);
-      document.getElementById('filterTo').value   = isoDate(to);
+
+    // Parse full dataset to get global launch ts
+    const full = parseCSV(csv);
+    GLOBAL_LAUNCH_TS = full._launchTs;
+
+    // Set datepicker defaults on first load only
+    const fromEl = document.getElementById('filterFrom');
+    const toEl   = document.getElementById('filterTo');
+    if(!fromEl.value) {
+      fromEl.value = isoDate(GLOBAL_LAUNCH_TS);
+      toEl.value   = isoDate(GLOBAL_LAUNCH_TS + full.maxDay * 86400);
     }
-    applyFilterToData(d);
+
+    applyFilterToData();
     dot.style.background = '#16a34a';
     txt.textContent = 'Live · ' + new Date().toLocaleTimeString();
   } catch(e) {
@@ -742,59 +748,75 @@ async function fetchLive() {
   }
 }
 
-function isoDate(d) {
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+// Convert unix timestamp → 'YYYY-MM-DD' in local time
+function isoDate(ts) {
+  const d = new Date(ts * 1000);
+  return d.getFullYear() + '-'
+    + String(d.getMonth()+1).padStart(2,'0') + '-'
+    + String(d.getDate()).padStart(2,'0');
+}
+
+// Convert 'YYYY-MM-DD' datepicker value → unix timestamp (start/end of day, local time)
+function dateToTs(val, endOfDay) {
+  const [y,m,d] = val.split('-').map(Number);
+  const dt = new Date(y, m-1, d, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0);
+  return dt.getTime() / 1000;
 }
 
 function applyFilter() {
   if(!RAW_CSV) { render(STATIC); renderStaticSegments(); return; }
-  applyFilterToData(parseCSV(RAW_CSV));
+  applyFilterToData();
 }
 
 function resetFilter() {
-  document.getElementById('filterFrom').value = '';
-  document.getElementById('filterTo').value   = '';
+  if(!RAW_CSV || !GLOBAL_LAUNCH_TS) return;
+  const full = parseCSV(RAW_CSV);
+  document.getElementById('filterFrom').value = isoDate(GLOBAL_LAUNCH_TS);
+  document.getElementById('filterTo').value   = isoDate(GLOBAL_LAUNCH_TS + full.maxDay * 86400);
   document.getElementById('filterInfo').textContent = '';
-  if(RAW_CSV) {
-    const d = parseCSV(RAW_CSV);
-    document.getElementById('filterFrom').value = isoDate(new Date(d._launchTs*1000));
-    document.getElementById('filterTo').value   = isoDate(new Date((d._launchTs+d.maxDay*86400)*1000));
-    applyFilterToData(d);
-  }
+  applyFilterToData();
 }
 
-function applyFilterToData(fullData) {
+function applyFilterToData() {
+  if(!RAW_CSV || !GLOBAL_LAUNCH_TS) return;
+
   const fromVal = document.getElementById('filterFrom').value;
   const toVal   = document.getElementById('filterTo').value;
+  if(!fromVal || !toVal) return;
 
-  if(!fromVal || !toVal || !RAW_CSV) {
-    render(fullData);
-    renderStaticSegments();
+  const fromTs = dateToTs(fromVal, false);
+  const toTs   = dateToTs(toVal, true);
+
+  // Filter raw CSV lines by timestamp column
+  const lines    = RAW_CSV.trim().split('\n');
+  const header   = lines[0];
+  const filtered = lines.slice(1).filter(line => {
+    const ts = parseFloat(line.split(',')[2]);
+    return !isNaN(ts) && ts >= fromTs && ts <= toTs;
+  });
+
+  if(filtered.length === 0) {
+    document.getElementById('filterInfo').textContent = 'No data in selected range';
     return;
   }
 
-  const fromTs = new Date(fromVal+'T00:00:00').getTime()/1000;
-  const toTs   = new Date(toVal+'T23:59:59').getTime()/1000;
+  // Parse filtered subset — pass global launch ts so daily chart axis stays stable
+  const d = parseCSV([header, ...filtered].join('\n'), GLOBAL_LAUNCH_TS);
 
-  // Filter CSV lines by timestamp
-  const lines  = RAW_CSV.trim().split('\n');
-  const header = lines[0];
-  const filtered = lines.slice(1).filter(line => {
-    const parts = line.split(',');
-    const ts = parseFloat(parts[2]);
-    return ts >= fromTs && ts <= toTs;
-  });
-
-  const filteredCSV = [header, ...filtered].join('\n');
-  const d = parseCSV(filteredCSV);
-
-  // Show filter info
-  const info = document.getElementById('filterInfo');
-  info.textContent = filtered.length + ' attempts · ' + d.totalUsers + ' users in range';
+  document.getElementById('filterInfo').textContent =
+    filtered.length + ' attempts · ' + d.totalUsers + ' users';
 
   render(d);
   renderStaticSegments();
 }
+
+// ── Init ──
+render(STATIC);
+renderStaticSegments();
+fetchLive();
+
+// ── Auto-refresh every 5 minutes ──
+setInterval(fetchLive, 5 * 60 * 1000);
 
 // ── Init ──
 render(STATIC);
