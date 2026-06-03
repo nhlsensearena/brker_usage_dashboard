@@ -196,6 +196,17 @@ h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0
   </div>
 </div>
 
+<div class="card" style="margin-top:1rem">
+  <div class="card-title">Failed attempts — time distribution per level</div>
+  <div class="card-desc">How long players spend on unsuccessful attempts, grouped by level. Reveals whether players give up early or play to the time limit.</div>
+  <div class="legend">
+    <div class="li"><div class="ld" style="background:rgba(59,130,246,.7)"></div>0–20s</div>
+    <div class="li"><div class="ld" style="background:rgba(217,119,6,.7)"></div>20–40s</div>
+    <div class="li"><div class="ld" style="background:rgba(220,38,38,.7)"></div>40–50s</div>
+  </div>
+  <div class="chart-wrap" style="height:240px"><canvas id="failTimeChart" role="img" aria-label="Failed attempts time distribution per level">Failed time distribution.</canvas></div>
+</div>
+
 <!-- ── SECTION 04: STARS ── -->
 <div class="sec-header"><span class="sec-num">04</span><span class="sec-title">Star ratings on successful attempts</span></div>
 
@@ -236,7 +247,7 @@ h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0
 </div>
 
 <div class="card">
-  <div class="card-title">Daily activity — D0 to D12</div>
+  <div class="card-title">Daily activity — May 20 to Jun 1</div>
   <div class="card-desc">Total attempts per day (bars) and new users joining (line).</div>
   <div class="legend">
     <div class="li"><div class="ld" style="background:#93c5fd"></div>Total attempts</div>
@@ -326,7 +337,12 @@ const STATIC = {
   returnGaps:[0.5,0.6,0.8,0.8,0.8,1.3,1.9,3.1,7.6,11.3,12.4,15.1,16.3,18.2,19.9,20.4,20.7,73.6,164.1],
   medianReturn:11.3,
   avgMaxLevelMulti:3.95,
-  avgMaxLevelSingle:1.60
+  avgMaxLevelSingle:1.60,
+  failTime:{
+    s0_20: [5,1,7,6,0,0,2,2,10,0,1],
+    s20_40:[3,13,15,48,0,0,0,0,2,0,1],
+    s40_50:[109,42,13,14,4,0,1,3,1,1,0]
+  }
 };
 
 // ── Parse CSV → compute all metrics ──
@@ -453,13 +469,22 @@ function parseCSV(text) {
     return a + Math.max(...userRows[u].map(r=>parseInt((r.level.match(/\d+/)||[0])[0])));
   },0)/singleUsers.length : 0;
 
+  // Failed attempts time distribution
+  const failTime = { s0_20:[], s20_40:[], s40_50:[] };
+  for(let l=1;l<=maxLevelNum;l++){
+    const lf = rows.filter((r,i)=>levelNums[i]===l && r.success===0);
+    failTime.s0_20.push( lf.filter(r=>r.time>=0  && r.time<20).length);
+    failTime.s20_40.push(lf.filter(r=>r.time>=20 && r.time<40).length);
+    failTime.s40_50.push(lf.filter(r=>r.time>=40).length);
+  }
+
   return {
     levels, reached, passed, successRate, attemptsToPass, avgTime, stuck,
     attemptsDay, newUsersDay, totalUsers, returnedUsers, sessionsDist,
     returnGaps, medianReturn, starsAvg, starsData,
     avgMaxLevelMulti: Math.round(avgMaxLevelMulti*100)/100,
     avgMaxLevelSingle: Math.round(avgMaxLevelSingle*100)/100,
-    maxDay
+    maxDay, failTime
   };
 }
 
@@ -576,7 +601,38 @@ function render(d) {
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:11}}},y:{grid:{color:gc},ticks:{color:tc},min:0}}}
   });
 
-  const dayLabels = d.attemptsDay.map((_,i)=>'D'+i);
+  // Failed time distribution chart
+  destroyChart('failTimeChart');
+  charts['failTimeChart'] = new Chart(document.getElementById('failTimeChart'), {
+    type:'bar',
+    data:{ labels: d.levels,
+      datasets:[
+        { label:'0–20s',  data: d.failTime.s0_20,  backgroundColor:'rgba(59,130,246,.7)',  borderRadius:3, stack:'t' },
+        { label:'20–40s', data: d.failTime.s20_40, backgroundColor:'rgba(217,119,6,.7)',   borderRadius:3, stack:'t' },
+        { label:'40–50s', data: d.failTime.s40_50, backgroundColor:'rgba(220,38,38,.7)',   borderRadius:3, stack:'t' }
+      ]
+    },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false },
+        tooltip:{ callbacks:{ footer: items => {
+          const total = items.reduce((s,i)=>s+i.raw,0);
+          return 'Total failed: '+total;
+        }}}
+      },
+      scales:{
+        x:{ grid:{color:gc}, ticks:{color:tc}, stacked:true },
+        y:{ grid:{color:gc}, ticks:{color:tc}, stacked:true,
+            title:{display:true, text:'failed attempts', color:tc, font:{size:10}} }
+      }
+    }
+  });
+
+  // Daily chart — real dates
+  const launchTs = 1747742106; // May 20 2026
+  const dayLabels = d.attemptsDay.map((_,i) => {
+    const d2 = new Date((launchTs + i*86400)*1000);
+    return d2.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  });
   destroyChart('dailyChart');
   charts['dailyChart'] = new Chart(document.getElementById('dailyChart'), {
     data:{labels:dayLabels,datasets:[
