@@ -1042,33 +1042,57 @@ function parseUnityCSV(text, forcedLaunchTs) {
   const warnedExited = warnedUsers.filter(u=>exitUsers.includes(u)).length;
   const noWarning = users.filter(u=>!warnedUsers.includes(u)).length;
 
-  // Hand tracking
+  // Hand tracking — only users who ever had Drill Started
+  const drillStartedUsers = [...new Set(rows.filter(r=>r.title==='Drill Started').map(r=>r.user_id))];
   const htUsers = [...new Set(rows.filter(r=>r.title==='Hand Tracking Not Active').map(r=>r.user_id))];
-  const htExited = htUsers.filter(u=>exitUsers.includes(u)).length;
+  const htWithDrill = htUsers.filter(u=>drillStartedUsers.includes(u));
+  // Churned = had HT event AND no Drill Started after last HT event
+  let htChurned = 0;
+  htWithDrill.forEach(uid => {
+    const uRows = rows.filter(r=>r.user_id===uid).sort((a,b)=>a.timestamp-b.timestamp);
+    const lastHtTs = uRows.filter(r=>r.title==='Hand Tracking Not Active').slice(-1)[0]?.timestamp || 0;
+    const drillAfter = uRows.filter(r=>r.timestamp > lastHtTs && r.title==='Drill Started');
+    if(drillAfter.length === 0) htChurned++;
+  });
 
   // Tutorial
   const tutRows = rows.filter(r=>r.title==='Tutorial Step Started');
   const tutUsers = [...new Set(tutRows.map(r=>r.user_id))];
   const skippedUsers = [...new Set(rows.filter(r=>r.title==='Tutorial Skipped').map(r=>r.user_id))];
-  const lastStep = {};
-  tutRows.forEach(r=>{ if(!lastStep[r.user_id]||r.tutorial_step>lastStep[r.user_id]) lastStep[r.user_id]=r.tutorial_step; });
-  const tutCompleted = Object.values(lastStep).filter(s=>s===33).length;
-  const tutStepDist = {};
-  Object.values(lastStep).forEach(s=>{ tutStepDist[s]=(tutStepDist[s]||0)+1; });
+  // Max step per user (ignoring 999 for funnel)
+  const maxStepPerUser = {};
+  tutRows.forEach(r=>{
+    const s = r.tutorial_step;
+    if(s === 999) return; // 999 is error repeat, not progression
+    if(!maxStepPerUser[r.user_id] || s > maxStepPerUser[r.user_id]) maxStepPerUser[r.user_id] = s;
+  });
+  const tutCompleted = Object.values(maxStepPerUser).filter(s=>s===33).length;
 
-  // Tutorial drops (last step before exit)
+  // Tutorial funnel: cumulative — how many users reached AT LEAST step N
+  const tutFunnelSteps = [1,2,3,4,5,8,11,14,33];
+  const tutFunnel = {};
+  tutFunnelSteps.forEach(s => {
+    tutFunnel[s] = Object.values(maxStepPerUser).filter(ms => ms >= s).length;
+  });
+  // Step 999 users (separately — error repeat, parallel state)
+  const step999Users = [...new Set(tutRows.filter(r=>r.tutorial_step===999).map(r=>r.user_id))].length;
+
+  // Tutorial Step Failed — by step and fail type
+  const tutFailByStep = {}; // { step: { fail_type: count } }
+  rows.filter(r=>r.title==='Tutorial Step Failed').forEach(r=>{
+    const step = r.tutorial_step;
+    const ft = r.fail_type || 'unknown';
+    if(!tutFailByStep[step]) tutFailByStep[step] = {};
+    tutFailByStep[step][ft] = (tutFailByStep[step][ft]||0) + 1;
+  });
+
+  // Tutorial drops (last step before exit — for drop chart)
   const tutDropDist = {};
   tutUsers.forEach(uid => {
     const uRows = rows.filter(r=>r.user_id===uid);
-    const ls = lastStep[uid];
+    const ls = maxStepPerUser[uid];
     const hasExit = uRows.some(r=>['App Exit','Application Pause'].includes(r.title));
-    if(hasExit && ls !== 33) tutDropDist[ls] = (tutDropDist[ls]||0)+1;
-  });
-
-  // Tutorial fail types
-  const tutFailTypes = {};
-  rows.filter(r=>r.title==='Tutorial Step Failed').forEach(r=>{
-    if(r.fail_type) tutFailTypes[r.fail_type]=(tutFailTypes[r.fail_type]||0)+1;
+    if(hasExit && ls && ls !== 33) tutDropDist[ls] = (tutDropDist[ls]||0)+1;
   });
 
   // Drill fails
@@ -1078,18 +1102,29 @@ function parseUnityCSV(text, forcedLaunchTs) {
   const drillFailByLevel = {};
   drillFails.forEach(r=>{ if(r.level_name) drillFailByLevel[r.level_name]=(drillFailByLevel[r.level_name]||0)+1; });
 
-  // Last event per user
-  const lastEvent = {};
-  rows.forEach(r=>{ lastEvent[r.user_id]=r.title; });
+  // Last meaningful event BEFORE last App Exit / Application Pause (exclude exit events themselves)
+  const EXIT_EVENTS_SET = new Set(['App Exit','Application Pause']);
   const lastEventDist = {};
-  Object.values(lastEvent).forEach(t=>{ lastEventDist[t]=(lastEventDist[t]||0)+1; });
+  users.forEach(uid => {
+    const uRows = rows.filter(r=>r.user_id===uid).sort((a,b)=>a.timestamp-b.timestamp);
+    const exits = uRows.filter(r=>EXIT_EVENTS_SET.has(r.title));
+    if(exits.length === 0) return;
+    const lastExitTs = exits[exits.length-1].timestamp;
+    const before = uRows.filter(r=>r.timestamp < lastExitTs && !EXIT_EVENTS_SET.has(r.title));
+    if(before.length > 0) {
+      const ev = before[before.length-1].title;
+      lastEventDist[ev] = (lastEventDist[ev]||0)+1;
+    }
+  });
 
   return {
     totalUsers: users.length,
     warnedUsers: warnedUsers.length, warnedStarted, warnedNotStarted, warnedExited, noWarning,
-    htUsers: htUsers.length, htExited,
+    htUsers: htUsers.length, htWithDrill: htWithDrill.length, htChurned,
+    drillStartedUsers: drillStartedUsers.length,
     tutUsers: tutUsers.length, tutCompleted, skippedUsers: skippedUsers.length,
-    tutStepDist, tutDropDist, tutFailTypes, drillFailTypes, drillFailByLevel,
+    tutFunnel, tutFunnelSteps, step999Users,
+    tutFailByStep, tutDropDist, drillFailTypes, drillFailByLevel,
     lastEventDist, _minTs: minTs, _maxTs: maxTs
   };
 }
@@ -1104,11 +1139,12 @@ function renderUnity(d) {
   document.getElementById('u-kpi-tut').textContent = d.tutCompleted;
   document.getElementById('u-kpi-tut-sub').textContent = 'of '+d.tutUsers+' who started';
   document.getElementById('u-tut-desc').textContent =
-    d.tutUsers+' users started. Only '+d.tutCompleted+' completed all 33 steps. '+d.skippedUsers+' skipped entirely.';
+    d.tutUsers+' users started. '+d.tutCompleted+' completed all 33 steps. '+d.skippedUsers+' skipped.';
 
   // Guardian doughnut
   destroyUChart('u-guardianChart');
-  uCharts['u-guardianChart'] = new Chart(document.getElementById('u-guardianChart'), {
+  const gCtx = document.getElementById('u-guardianChart');
+  if(gCtx) uCharts['u-guardianChart'] = new Chart(gCtx, {
     type:'doughnut',
     data:{ labels:['Warned → never started','Warned → started anyway','No warning'],
       datasets:[{ data:[d.warnedNotStarted, d.warnedStarted, d.noWarning],
@@ -1120,24 +1156,25 @@ function renderUnity(d) {
   // Guardian table
   const gtBody = document.querySelector('#u-guardian-table tbody');
   if(gtBody) {
-    const rows2 = [
-      ['Warned → never started', d.warnedNotStarted, Math.round(d.warnedNotStarted/d.warnedUsers*100), '#dc2626'],
-      ['Warned → started anyway', d.warnedStarted, Math.round(d.warnedStarted/d.warnedUsers*100), '#d97706'],
-      ['No warning → started normally', d.noWarning, null, '#16a34a'],
-    ];
-    gtBody.innerHTML = rows2.map(([label,n,pct,col])=>`
-      <tr><td>${label}</td><td class="mono" style="color:${col}">${n}</td>
-      <td class="mono">${pct!=null?pct+'%':'—'}</td>
-      <td><div class="inline-bar-wrap"><div class="inline-bar" style="width:${pct||Math.round(n/d.totalUsers*100)}%;background:${col}"></div></div></td></tr>
-    `).join('');
+    const wPct1 = d.warnedUsers ? Math.round(d.warnedNotStarted/d.warnedUsers*100) : 0;
+    const wPct2 = d.warnedUsers ? Math.round(d.warnedStarted/d.warnedUsers*100) : 0;
+    gtBody.innerHTML = `
+      <tr><td>Warned → never started</td><td class="mono red">${d.warnedNotStarted}</td><td class="mono">${wPct1}%</td>
+        <td><div class="inline-bar-wrap"><div class="inline-bar" style="width:${wPct1}%;background:#dc2626"></div></div></td></tr>
+      <tr><td>Warned → started anyway</td><td class="mono amber">${d.warnedStarted}</td><td class="mono">${wPct2}%</td>
+        <td><div class="inline-bar-wrap"><div class="inline-bar" style="width:${wPct2}%;background:#d97706"></div></div></td></tr>
+      <tr><td>No warning</td><td class="mono green">${d.noWarning}</td><td class="mono">—</td>
+        <td><div class="inline-bar-wrap"><div class="inline-bar" style="width:${Math.round(d.noWarning/d.totalUsers*100)}%;background:#16a34a"></div></div></td></tr>
+    `;
   }
 
-  // Hand tracking chart
+  // Hand tracking — drill_started users only; churned = HT then no more Drill Started
   destroyUChart('u-htChart');
-  uCharts['u-htChart'] = new Chart(document.getElementById('u-htChart'), {
+  const htCtx = document.getElementById('u-htChart');
+  if(htCtx) uCharts['u-htChart'] = new Chart(htCtx, {
     type:'bar',
-    data:{ labels:['Had tracking issue','Exited after','No issue'],
-      datasets:[{ data:[d.htUsers, d.htExited, d.totalUsers-d.htUsers],
+    data:{ labels:['Had HT issue','Churned after HT','No HT issue (had drill)'],
+      datasets:[{ data:[d.htWithDrill, d.htChurned, d.drillStartedUsers - d.htWithDrill],
         backgroundColor:['#d97706','#dc2626','#16a34a'], borderRadius:4 }] },
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
       scales:{ x:{grid:{color:gc},ticks:{color:tc}}, y:{grid:{color:gc},ticks:{color:tc},min:0} } }
@@ -1145,109 +1182,116 @@ function renderUnity(d) {
 
   // Friction table
   const ftBody = document.querySelector('#u-friction-table tbody');
-  if(ftBody) {
-    ftBody.innerHTML = `
-      <tr><td>Small guardian (room too small)</td><td class="mono">${d.warnedUsers}</td><td class="mono red">${d.warnedExited}</td></tr>
-      <tr><td>Hand tracking not active</td><td class="mono">${d.htUsers}</td><td class="mono red">${d.htExited}</td></tr>
-      <tr><td>No technical issues</td><td class="mono green">${d.noWarning}</td><td class="mono">—</td></tr>
-    `;
+  if(ftBody) ftBody.innerHTML = `
+    <tr><td>Small guardian (room too small)</td><td class="mono">${d.warnedUsers}</td><td class="mono red">${d.warnedExited}</td></tr>
+    <tr><td>Hand tracking not active</td><td class="mono">${d.htWithDrill}</td><td class="mono red">${d.htChurned}</td></tr>
+  `;
+
+  // Tutorial funnel — cumulative: how many reached AT LEAST step N
+  const tutEl = document.getElementById('u-tutFunnel');
+  if(tutEl) {
+    tutEl.innerHTML = '';
+    const maxN = d.tutFunnel[1] || 1;
+    d.tutFunnelSteps.forEach(step => {
+      const n = d.tutFunnel[step] || 0;
+      const pct = Math.round(n/maxN*100);
+      const col = step===33?'#16a34a':pct<40?'#dc2626':pct<70?'#d97706':'#2563eb';
+      const row = document.createElement('div'); row.className='tut-row';
+      row.innerHTML=`<span class="tut-label">Step ${step}</span>
+        <div class="tut-bar-wrap"><div class="tut-bar" style="width:${pct}%;background:${col}"></div></div>
+        <span class="tut-n" style="color:${col}">${n}</span>
+        ${step===33?'<span class="tut-note">✓ completed</span>':''}`;
+      tutEl.appendChild(row);
+    });
+    const note999 = document.createElement('div');
+    note999.style.cssText='font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:6px;padding-left:72px';
+    note999.textContent='Step 999 (error repeat): '+d.step999Users+' users encountered it';
+    tutEl.appendChild(note999);
   }
 
-  // Tutorial funnel
-  const tutEl = document.getElementById('u-tutFunnel');
-  tutEl.innerHTML = '';
-  const tutSteps = [1,2,3,4,5,8,11,14,33];
-  const maxN = d.tutUsers || 1;
-  tutSteps.forEach(step => {
-    const n = d.tutStepDist[step] || 0;
-    const pct = Math.round(n/maxN*100);
-    const col = step===33?'#16a34a':n<5?'#dc2626':n<15?'#d97706':'#2563eb';
-    const note = step===33?'completed ✓':step===999?'repeat warning':'';
-    const row = document.createElement('div');
-    row.className='tut-row';
-    row.innerHTML=`<span class="tut-label">Step ${step}</span>
-      <div class="tut-bar-wrap"><div class="tut-bar" style="width:${pct}%;background:${col}"></div></div>
-      <span class="tut-n" style="color:${col}">${n}</span>
-      ${note?`<span class="tut-note">${note}</span>`:''}`;
-    tutEl.appendChild(row);
-  });
-  // step 999
-  const n999 = d.tutStepDist[999]||0;
-  const pct999 = Math.round(n999/maxN*100);
-  const r999 = document.createElement('div'); r999.className='tut-row';
-  r999.innerHTML=`<span class="tut-label">Step 999</span>
-    <div class="tut-bar-wrap"><div class="tut-bar" style="width:${pct999}%;background:#d97706"></div></div>
-    <span class="tut-n" style="color:#d97706">${n999}</span>
-    <span class="tut-note">repeat / error</span>`;
-  tutEl.appendChild(r999);
-
-  // Tutorial fail chart
+  // Tutorial Step Failed — grouped bar by step × fail_type
   destroyUChart('u-tutFailChart');
-  const tfLabels = Object.keys(d.tutFailTypes);
-  const tfData   = Object.values(d.tutFailTypes);
-  uCharts['u-tutFailChart'] = new Chart(document.getElementById('u-tutFailChart'), {
-    type:'bar', data:{ labels:tfLabels, datasets:[{ data:tfData,
-      backgroundColor:['#dc2626','#d97706','#ea580c','#b0b0b8'], borderRadius:4 }] },
-    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
-      scales:{ x:{grid:{color:gc},ticks:{color:tc,font:{family:'IBM Plex Mono',size:10}}},
-               y:{grid:{display:false},ticks:{color:tc,font:{family:'IBM Plex Mono',size:10}}} } }
-  });
+  const tfCtx = document.getElementById('u-tutFailChart');
+  if(tfCtx) {
+    const steps = Object.keys(d.tutFailByStep).map(Number).sort((a,b)=>a-b);
+    const allTypes = [...new Set(Object.values(d.tutFailByStep).flatMap(o=>Object.keys(o)))];
+    const typeColors = {'FailedMissedStopButton':'#dc2626','FailedNoDunk':'#d97706','FailedTime':'#ea580c','FailedSlowDownSpeedUp':'#7c3aed','unknown':'#b0b0b8'};
+    uCharts['u-tutFailChart'] = new Chart(tfCtx, {
+      type:'bar',
+      data:{ labels:steps.map(s=>'Step '+s), datasets:allTypes.map(ft=>({
+        label:ft, data:steps.map(s=>d.tutFailByStep[s]?.[ft]||0),
+        backgroundColor:typeColors[ft]||'#b0b0b8', borderRadius:3
+      }))},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ position:'bottom', labels:{font:{family:'IBM Plex Mono',size:10},color:tc,boxWidth:10,padding:10} } },
+        scales:{ x:{grid:{color:gc},ticks:{color:tc}}, y:{grid:{color:gc},ticks:{color:tc},min:0,title:{display:true,text:'failures',color:tc,font:{size:10}}} }
+      }
+    });
+  }
 
   // Tutorial drop chart
   destroyUChart('u-tutDropChart');
-  const dropKeys = Object.keys(d.tutDropDist).map(Number).sort((a,b)=>a-b);
-  const dropVals = dropKeys.map(k=>d.tutDropDist[k]);
-  const dropColors = dropKeys.map(k=>k===999?'#dc2626':dropVals[dropKeys.indexOf(k)]>=5?'#dc2626':dropVals[dropKeys.indexOf(k)]>=2?'#d97706':'#b0b0b8');
-  uCharts['u-tutDropChart'] = new Chart(document.getElementById('u-tutDropChart'), {
-    type:'bar', data:{ labels:dropKeys.map(k=>'Step '+k), datasets:[{ data:dropVals,
-      backgroundColor:dropColors, borderRadius:4 }] },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
-      scales:{ x:{grid:{color:gc},ticks:{color:tc}}, y:{grid:{color:gc},ticks:{color:tc},min:0} } }
-  });
+  const tdCtx = document.getElementById('u-tutDropChart');
+  if(tdCtx) {
+    const dropKeys = Object.keys(d.tutDropDist).map(Number).sort((a,b)=>a-b);
+    const dropVals = dropKeys.map(k=>d.tutDropDist[k]);
+    uCharts['u-tutDropChart'] = new Chart(tdCtx, {
+      type:'bar', data:{ labels:dropKeys.map(k=>'Step '+k), datasets:[{ data:dropVals,
+        backgroundColor:dropVals.map(v=>v>=5?'#dc2626':v>=2?'#d97706':'#b0b0b8'), borderRadius:4 }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+        scales:{ x:{grid:{color:gc},ticks:{color:tc}}, y:{grid:{color:gc},ticks:{color:tc},min:0} } }
+    });
+  }
 
   // Drill fail type doughnut
   destroyUChart('u-drillFailTypeChart');
-  const dftLabels = Object.keys(d.drillFailTypes);
-  const dftData   = Object.values(d.drillFailTypes);
-  const dftColors = ['#dc2626','#d97706','#7c3aed','#2563eb','#2563ebaa','#b0b0b8'];
-  uCharts['u-drillFailTypeChart'] = new Chart(document.getElementById('u-drillFailTypeChart'), {
-    type:'doughnut', data:{ labels:dftLabels,
-      datasets:[{ data:dftData, backgroundColor:dftColors.slice(0,dftLabels.length), borderWidth:0 }] },
-    options:{ responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{ position:'bottom', labels:{ font:{family:'IBM Plex Mono',size:10}, color:tc, boxWidth:10, padding:10 } } } }
-  });
+  const dftCtx = document.getElementById('u-drillFailTypeChart');
+  if(dftCtx) {
+    const dftLabels = Object.keys(d.drillFailTypes);
+    const dftData = Object.values(d.drillFailTypes);
+    uCharts['u-drillFailTypeChart'] = new Chart(dftCtx, {
+      type:'doughnut', data:{ labels:dftLabels,
+        datasets:[{ data:dftData, backgroundColor:['#dc2626','#d97706','#7c3aed','#2563eb','#2563ebaa','#b0b0b8'].slice(0,dftLabels.length), borderWidth:0 }] },
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ position:'bottom', labels:{font:{family:'IBM Plex Mono',size:10},color:tc,boxWidth:10,padding:10} } } }
+    });
+  }
 
-  // Drill fail by level bar
+  // Drill fail by level
   destroyUChart('u-drillFailLevelChart');
-  const dflEntries = Object.entries(d.drillFailByLevel).sort((a,b)=>b[1]-a[1]);
-  uCharts['u-drillFailLevelChart'] = new Chart(document.getElementById('u-drillFailLevelChart'), {
-    type:'bar', data:{ labels:dflEntries.map(e=>e[0]), datasets:[{ data:dflEntries.map(e=>e[1]),
-      backgroundColor:'rgba(124,58,237,.65)', borderRadius:3 }] },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
-      scales:{ x:{grid:{color:gc},ticks:{color:tc,font:{size:10}}}, y:{grid:{color:gc},ticks:{color:tc},min:0} } }
-  });
+  const dflCtx = document.getElementById('u-drillFailLevelChart');
+  if(dflCtx) {
+    const dflEntries = Object.entries(d.drillFailByLevel).sort((a,b)=>b[1]-a[1]);
+    uCharts['u-drillFailLevelChart'] = new Chart(dflCtx, {
+      type:'bar', data:{ labels:dflEntries.map(e=>e[0]), datasets:[{ data:dflEntries.map(e=>e[1]),
+        backgroundColor:'rgba(124,58,237,.65)', borderRadius:3 }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+        scales:{ x:{grid:{color:gc},ticks:{color:tc,font:{size:10}}}, y:{grid:{color:gc},ticks:{color:tc},min:0} } }
+    });
+  }
 
-  // Churn flow
+  // Last meaningful event BEFORE App Exit / Pause (not including exit events)
   const churnEl = document.getElementById('u-churnFlow');
-  churnEl.innerHTML = '';
-  const churnEntries = Object.entries(d.lastEventDist).sort((a,b)=>b[1]-a[1]);
-  const churnMax = churnEntries[0]?.[1] || 1;
-  const churnCols = {
-    'App Exit':'#16a34a','Application Pause':'#dc2626',
-    'User Boundary Dimensions':'#dc2626','Small Guardian Warning':'#dc2626',
-    'Tutorial Step Started':'#d97706','Drill Failed':'#d97706',
-    'Drill Started':'#d97706','Hand Tracking Not Active':'#dc2626',
-    'Tutorial Skipped':'#b0b0b8'
-  };
-  churnEntries.forEach(([ev,n])=>{
-    const col = churnCols[ev]||'#b0b0b8';
-    const pct = Math.round(n/churnMax*100);
-    const row = document.createElement('div'); row.className='churn-row';
-    row.innerHTML=`<div class="churn-label"><span class="event-tag">${ev}</span></div>
-      <div class="churn-bar-wrap"><div class="churn-bar" style="width:${pct}%;background:${col}"></div></div>
-      <span class="churn-count" style="color:${col}">${n}</span>`;
-    churnEl.appendChild(row);
-  });
+  if(churnEl) {
+    churnEl.innerHTML = '';
+    const churnEntries = Object.entries(d.lastEventDist).sort((a,b)=>b[1]-a[1]);
+    const churnMax = churnEntries[0]?.[1] || 1;
+    const churnCols = {
+      'Small Guardian Warning':'#dc2626','User Boundary Dimensions':'#dc2626',
+      'Hand Tracking Not Active':'#dc2626','Drill Failed':'#d97706',
+      'Tutorial Step Started':'#d97706','Drill Started':'#d97706',
+      'Tutorial Step Failed':'#dc2626','Tutorial Skipped':'#b0b0b8'
+    };
+    churnEntries.forEach(([ev,n]) => {
+      const col = churnCols[ev]||'#b0b0b8';
+      const pct = Math.round(n/churnMax*100);
+      const row = document.createElement('div'); row.className='churn-row';
+      row.innerHTML=`<div class="churn-label"><span class="event-tag">${ev}</span></div>
+        <div class="churn-bar-wrap"><div class="churn-bar" style="width:${pct}%;background:${col}"></div></div>
+        <span class="churn-count" style="color:${col}">${n}</span>`;
+      churnEl.appendChild(row);
+    });
+  }
 }
 
 // ── Unity filter ──
