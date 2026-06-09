@@ -419,6 +419,13 @@ h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0
   </div>
 </div>
 
+<!-- Guardian size scatter -->
+<div class="card">
+  <div class="card-title">Guardian size distribution (depth × width, meters)</div>
+  <div class="card-desc">Recorded at login. Minimum usable space for the game is approx. 1.5m × 1.5m.</div>
+  <div class="chart-wrap" style="height:260px"><canvas id="u-guardianSizeChart"></canvas></div>
+</div>
+
 <!-- S02: Hand tracking -->
 <div class="sec-header"><span class="sec-num">02</span><span class="sec-title">Hand tracking issues</span></div>
 <div class="two-col">
@@ -1059,26 +1066,20 @@ function parseUnityCSV(text, forcedLaunchTs) {
   const tutRows = rows.filter(r=>r.title==='Tutorial Step Started');
   const tutUsers = [...new Set(tutRows.map(r=>r.user_id))];
   const skippedUsers = [...new Set(rows.filter(r=>r.title==='Tutorial Skipped').map(r=>r.user_id))];
-  // Max step per user (ignoring 999 for funnel)
+  // Max step per user — parseInt for robustness (Sheets CSV may return "33" or "33.0")
   const maxStepPerUser = {};
   tutRows.forEach(r=>{
-    const s = Math.round(r.tutorial_step); // parseFloat("33.0") = 33.0, Math.round ensures integer
-    if(s === 999) return;
+    const s = parseInt(r.tutorial_step, 10);
+    if(isNaN(s) || s === 999) return;
     if(!maxStepPerUser[r.user_id] || s > maxStepPerUser[r.user_id]) maxStepPerUser[r.user_id] = s;
   });
-  const tutCompleted = Object.values(maxStepPerUser).filter(s => Math.round(s) === 33).length;
-  // Debug: log completed users
-  console.log('[TUT] maxStepPerUser dist:', Object.values(maxStepPerUser).reduce((acc,s)=>{acc[s]=(acc[s]||0)+1;return acc;},{}));
-  console.log('[TUT] tutCompleted:', tutCompleted, '| tutFunnel[33] will be:', Object.values(maxStepPerUser).filter(s=>Math.round(s)>=33).length);
-
-  // Tutorial funnel: cumulative — how many users reached AT LEAST step N
+  const tutCompleted = Object.values(maxStepPerUser).filter(s => s === 33).length;
   const tutFunnelSteps = [1,2,3,4,5,8,11,14,33];
   const tutFunnel = {};
-  tutFunnelSteps.forEach(s => {
-    tutFunnel[s] = Object.values(maxStepPerUser).filter(ms => Math.round(ms) >= s).length;
-  });
-  // Step 999 users (separately — error repeat, parallel state)
-  const step999Users = [...new Set(tutRows.filter(r=>r.tutorial_step===999).map(r=>r.user_id))].length;
+  tutFunnelSteps.forEach(s => { tutFunnel[s] = Object.values(maxStepPerUser).filter(ms => ms >= s).length; });
+
+  // step999 users
+  const step999Users = [...new Set(tutRows.filter(r=>parseInt(r.tutorial_step,10)===999).map(r=>r.user_id))].length;
 
   // Tutorial Step Failed — by step and fail type
   const tutFailByStep = {}; // { step: { fail_type: count } }
@@ -1121,7 +1122,7 @@ function parseUnityCSV(text, forcedLaunchTs) {
   });
 
   return {
-    totalUsers: users.length,
+    totalUsers: users.length, rows,
     warnedUsers: warnedUsers.length, warnedStarted, warnedNotStarted, warnedExited, noWarning,
     htUsers: htUsers.length, htWithDrill: htWithDrill.length, htChurned,
     drillStartedUsers: drillStartedUsers.length,
@@ -1157,7 +1158,7 @@ function renderUnity(d) {
   });
 
   // Guardian table
-  const gtBody = document.querySelector('#u-guardian-table tbody');
+  const gtBody = document.getElementById('u-guardian-table');
   if(gtBody) {
     const wPct1 = d.warnedUsers ? Math.round(d.warnedNotStarted/d.warnedUsers*100) : 0;
     const wPct2 = d.warnedUsers ? Math.round(d.warnedStarted/d.warnedUsers*100) : 0;
@@ -1169,6 +1170,33 @@ function renderUnity(d) {
       <tr><td>No warning</td><td class="mono green">${d.noWarning}</td><td class="mono">—</td>
         <td><div class="inline-bar-wrap"><div class="inline-bar" style="width:${Math.round(d.noWarning/d.totalUsers*100)}%;background:#16a34a"></div></div></td></tr>
     `;
+  }
+
+  // Guardian size scatter
+  destroyUChart('u-guardianSizeChart');
+  const gsCtx = document.getElementById('u-guardianSizeChart');
+  if(gsCtx) {
+    // Use raw guardian dimension data
+    const gdData = rows
+      .filter(r=>r.title==='User Boundary Dimensions' && !isNaN(r.depth) && !isNaN(r.width))
+      .map(r=>({x: Math.round(r.depth*100)/100, y: Math.round(r.width*100)/100}));
+    uCharts['u-guardianSizeChart'] = new Chart(gsCtx, {
+      type:'scatter',
+      data:{ datasets:[
+        { label:'Guardian size', data:gdData, backgroundColor:'rgba(37,99,235,.35)', pointRadius:5 },
+        { label:'1.5m threshold', data:[{x:0,y:1.5},{x:12,y:1.5}], type:'line',
+          borderColor:'#dc2626', borderWidth:1.5, borderDash:[4,3], pointRadius:0 }
+      ]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ display:false },
+          tooltip:{ callbacks:{ label: ctx => ctx.dataset.label==='Guardian size' ? `depth ${ctx.raw.x}m × width ${ctx.raw.y}m` : '1.5m min' }}
+        },
+        scales:{
+          x:{ grid:{color:gc}, ticks:{color:tc}, title:{display:true,text:'depth (m)',color:tc,font:{size:10}}, min:0, max:12 },
+          y:{ grid:{color:gc}, ticks:{color:tc}, title:{display:true,text:'width (m)',color:tc,font:{size:10}}, min:0, max:12 }
+        }
+      }
+    });
   }
 
   // Hand tracking — drill_started users only; churned = HT then no more Drill Started
