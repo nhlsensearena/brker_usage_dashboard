@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BRKER — Game Flow Report</title>
+<title>BRKER — Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
@@ -33,11 +33,19 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); font
 .page { max-width: 1060px; margin: 0 auto; padding: 3rem 2rem 6rem; }
 
 /* ── Header ── */
-.header { display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 2rem; padding-bottom: 2rem; border-bottom: 1.5px solid var(--text); margin-bottom: 3rem; }
+.header { display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 2rem; padding-bottom: 2rem; border-bottom: 1.5px solid var(--text); margin-bottom: 0; }
 .h-eyebrow { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: .6rem; }
 h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0; }
 .header-meta { font-family: var(--mono); font-size: 11px; color: var(--muted); line-height: 2.1; text-align: right; }
 .header-meta b { color: var(--text); font-weight: 500; }
+
+/* ── Tabs ── */
+.tab-nav { display: flex; gap: 0; margin: 0 0 2.5rem; border-bottom: 1px solid var(--border); }
+.tab-btn { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; padding: .85rem 1.5rem; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; color: var(--muted); transition: color .15s, border-color .15s; margin-bottom: -1px; }
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--text); border-bottom-color: var(--text); font-weight: 500; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
 
 /* ── Section ── */
 .sec-header { display: flex; align-items: baseline; gap: 1rem; margin: 3rem 0 1.25rem; padding-bottom: .5rem; border-bottom: 0.5px solid var(--border); }
@@ -79,6 +87,7 @@ h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0
 .f-stats { width: 170px; flex-shrink: 0; display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
 .f-nums { font-family: var(--mono); font-size: 10px; color: var(--muted); }
 .f-pct { font-family: var(--mono); font-size: 11px; font-weight: 500; min-width: 34px; text-align: right; }
+
 /* ── Stars bar ── */
 .stars-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-family: var(--mono); font-size: 11px; }
 .stars-bar-wrap { flex: 1; height: 14px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
@@ -119,6 +128,31 @@ h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0
 .finding-body { font-size: 12px; color: var(--muted); line-height: 1.65; }
 .finding-body b { color: var(--text); font-weight: 500; }
 
+/* ── Unity specific ── */
+.stat-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.stat-table th { font-family: var(--mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; text-align: left; padding: .4rem .6rem; border-bottom: 1px solid var(--border); font-weight: 400; }
+.stat-table td { padding: .45rem .6rem; border-bottom: 0.5px solid var(--bg3); }
+.stat-table tr:last-child td { border-bottom: none; }
+.stat-table tr:hover td { background: var(--bg2); }
+.mono { font-family: var(--mono); font-size: 11px; }
+.bar-cell { width: 140px; }
+.inline-bar-wrap { height: 8px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
+.inline-bar { height: 100%; border-radius: 2px; }
+.churn-flow { display: flex; flex-direction: column; gap: 8px; }
+.churn-row { display: flex; align-items: center; gap: 10px; }
+.churn-label { font-size: 12.5px; flex: 1; }
+.churn-label .event-tag { font-family: var(--mono); font-size: 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: 3px; padding: 2px 7px; }
+.churn-count { font-family: var(--mono); font-size: 12px; font-weight: 500; min-width: 30px; text-align: right; }
+.churn-bar-wrap { width: 160px; height: 14px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
+.churn-bar { height: 100%; border-radius: 2px; }
+.tut-funnel { display: flex; flex-direction: column; gap: 6px; }
+.tut-row { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+.tut-label { font-family: var(--mono); font-size: 10px; color: var(--muted); width: 64px; flex-shrink: 0; }
+.tut-bar-wrap { flex: 1; height: 16px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
+.tut-bar { height: 100%; border-radius: 2px; }
+.tut-n { font-family: var(--mono); font-size: 11px; font-weight: 500; min-width: 24px; text-align: right; }
+.tut-note { font-size: 11px; color: var(--muted); margin-left: 4px; }
+
 /* ── Footer ── */
 .footer { margin-top: 5rem; padding-top: 1.5rem; border-top: 1.5px solid var(--text); display: flex; justify-content: space-between; align-items: center; }
 .footer-l { font-family: var(--mono); font-size: 10px; color: var(--muted); line-height: 2; }
@@ -127,6 +161,7 @@ h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0
 @media(max-width:700px){
   .kpi-row{grid-template-columns:1fr 1fr}.two-col,.three-col,.seg-grid,.findings-grid{grid-template-columns:1fr}
   h1{font-size:2.2rem}.header{grid-template-columns:1fr}.header-meta{text-align:left}.session-stat-grid{grid-template-columns:1fr 1fr}
+  .tab-btn{padding:.65rem .9rem;font-size:10px}
 }
 </style>
 </head>
@@ -136,7 +171,7 @@ h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0
 <!-- HEADER -->
 <div class="header">
   <div>
-    <div class="h-eyebrow">Game Flow Report</div>
+    <div class="h-eyebrow">Analytics Dashboard</div>
     <h1>BRKER</h1>
   </div>
   <div class="header-meta">
@@ -144,6 +179,17 @@ h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0
     <b>Users</b> <span id="hdr-users">—</span>
   </div>
 </div>
+
+<!-- TABS -->
+<div class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('usage',this)">Game Flow</button>
+  <button class="tab-btn" onclick="switchTab('unity',this)">Unity Events</button>
+</div>
+
+<!-- ══════════════════════════════════════
+     TAB: GAME FLOW (usage)
+═══════════════════════════════════════ -->
+<div id="tab-usage" class="tab-panel active">
 
 <!-- DATE FILTER -->
 <div id="filterBar" style="display:flex;align-items:center;gap:12px;margin-bottom:2rem;padding:.85rem 1.25rem;background:#f7f7f8;border:1px solid #e4e4e8;border-radius:8px;flex-wrap:wrap">
@@ -323,14 +369,131 @@ h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0
   <div class="footer-r">BRKER</div>
 </div>
 
-<!-- LIVE DATA BANNER -->
-<div id="liveBanner" style="position:fixed;bottom:1.5rem;right:1.5rem;background:#111114;color:#fff;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:.6rem 1rem;border-radius:6px;display:flex;align-items:center;gap:8px;z-index:999;box-shadow:0 2px 12px rgba(0,0,0,.15)">
-  <span id="liveDot" style="width:7px;height:7px;border-radius:50%;background:#d97706;flex-shrink:0"></span>
-  <span id="liveText">Loading live data…</span>
-  <button onclick="fetchLive()" style="margin-left:6px;background:none;border:1px solid rgba(255,255,255,.2);color:#fff;font-family:inherit;font-size:10px;padding:2px 7px;border-radius:3px;cursor:pointer">↻ Refresh</button>
+</div><!-- /tab-usage -->
+
+<!-- ══════════════════════════════════════
+     TAB: UNITY EVENTS
+═══════════════════════════════════════ -->
+<div id="tab-unity" class="tab-panel">
+
+<!-- Unity date filter -->
+<div id="unityFilterBar" style="display:flex;align-items:center;gap:12px;margin-bottom:2rem;padding:.85rem 1.25rem;background:#f7f7f8;border:1px solid #e4e4e8;border-radius:8px;flex-wrap:wrap">
+  <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7a7a85;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap">Date range</span>
+  <div style="display:flex;align-items:center;gap:8px">
+    <label style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7a7a85">From</label>
+    <input type="date" id="uFilterFrom" style="font-family:'IBM Plex Mono',monospace;font-size:11px;padding:4px 8px;border:1px solid #d0d0d6;border-radius:4px;background:#fff;color:#111114;outline:none;cursor:pointer">
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <label style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7a7a85">To</label>
+    <input type="date" id="uFilterTo" style="font-family:'IBM Plex Mono',monospace;font-size:11px;padding:4px 8px;border:1px solid #d0d0d6;border-radius:4px;background:#fff;color:#111114;outline:none;cursor:pointer">
+  </div>
+  <button onclick="applyUnityFilter()" style="font-family:'IBM Plex Mono',monospace;font-size:10px;padding:5px 14px;background:#111114;color:#fff;border:none;border-radius:4px;cursor:pointer;letter-spacing:.05em">Apply</button>
+  <button onclick="resetUnityFilter()" style="font-family:'IBM Plex Mono',monospace;font-size:10px;padding:5px 14px;background:none;color:#7a7a85;border:1px solid #d0d0d6;border-radius:4px;cursor:pointer">Reset</button>
+  <span id="uFilterInfo" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7a7a85;margin-left:4px"></span>
 </div>
 
-</div><!-- /page -->
+<!-- Unity KPIs -->
+<div class="kpi-row" id="u-kpi-row">
+  <div class="kpi"><div class="kpi-label">Total users</div><div class="kpi-value blue" id="u-kpi-users">119</div><div class="kpi-sub">unique players</div></div>
+  <div class="kpi"><div class="kpi-label">Small guardian</div><div class="kpi-value red" id="u-kpi-guardian">77</div><div class="kpi-sub" id="u-kpi-guardian-sub">65% of users warned</div></div>
+  <div class="kpi"><div class="kpi-label">Blocked by guardian</div><div class="kpi-value red" id="u-kpi-blocked">55</div><div class="kpi-sub">never started</div></div>
+  <div class="kpi"><div class="kpi-label">Hand tracking issue</div><div class="kpi-value amber" id="u-kpi-ht">24</div><div class="kpi-sub">20% of users</div></div>
+  <div class="kpi"><div class="kpi-label">Tutorial completed</div><div class="kpi-value green" id="u-kpi-tut">3</div><div class="kpi-sub" id="u-kpi-tut-sub">of 47 who started</div></div>
+</div>
+
+<!-- S01: Guardian -->
+<div class="sec-header"><span class="sec-num">01</span><span class="sec-title">Guardian — room size issues</span></div>
+<div class="two-col">
+  <div class="card">
+    <div class="card-title">Guardian warning — session outcome</div>
+    <div class="card-desc">Share of warned users who still proceeded vs. exited immediately.</div>
+    <div class="chart-wrap" style="height:210px"><canvas id="u-guardianChart"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Guardian warning — detailed breakdown</div>
+    <div class="card-desc">What happened after the small guardian warning was shown.</div>
+    <table class="stat-table" style="margin-top:.25rem">
+      <thead><tr><th>Outcome</th><th>Users</th><th>% of warned</th><th class="bar-cell"></th></tr></thead>
+      <tbody id="u-guardian-table"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- S02: Hand tracking -->
+<div class="sec-header"><span class="sec-num">02</span><span class="sec-title">Hand tracking issues</span></div>
+<div class="two-col">
+  <div class="card">
+    <div class="card-title">Hand tracking — session outcome</div>
+    <div class="card-desc">Users who hit the "Hand Tracking Not Active" warning and their subsequent behaviour.</div>
+    <div class="chart-wrap" style="height:190px"><canvas id="u-htChart"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Technical friction summary</div>
+    <div class="card-desc">Combined view of hardware/setup issues before any gameplay.</div>
+    <table class="stat-table" style="margin-top:.25rem" id="u-friction-table">
+      <thead><tr><th>Issue</th><th>Users</th><th>Churned after</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- S03: Tutorial -->
+<div class="sec-header"><span class="sec-num">03</span><span class="sec-title">Tutorial — funnel & dropout</span></div>
+<div class="two-col">
+  <div class="card">
+    <div class="card-title">How far users got in the tutorial</div>
+    <div class="card-desc" id="u-tut-desc">47 users started. Only 3 completed all 33 steps. 30 skipped entirely.</div>
+    <div class="tut-funnel" id="u-tutFunnel"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Tutorial Step Failed — error types</div>
+    <div class="card-desc">Types of errors causing tutorial step failures.</div>
+    <div class="chart-wrap" style="height:210px"><canvas id="u-tutFailChart"></canvas></div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-title">Tutorial step dropout — last step before exit</div>
+  <div class="card-desc">Step 999 = repeat warning (error correction shown to user). Steps 2 and 999 are the biggest drop points.</div>
+  <div class="chart-wrap" style="height:210px"><canvas id="u-tutDropChart"></canvas></div>
+</div>
+
+<!-- S04: Drill failures -->
+<div class="sec-header"><span class="sec-num">04</span><span class="sec-title">Drill failures — by level & type</span></div>
+<div class="two-col">
+  <div class="card">
+    <div class="card-title">Drill Failed — fail type breakdown</div>
+    <div class="card-desc">All non-tutorial drill failures. Time-outs dominate.</div>
+    <div class="chart-wrap" style="height:230px"><canvas id="u-drillFailTypeChart"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Drill failures per level</div>
+    <div class="card-desc">L1 accounts for the large majority of failures.</div>
+    <div class="chart-wrap" style="height:230px"><canvas id="u-drillFailLevelChart"></canvas></div>
+  </div>
+</div>
+
+<!-- S05: Churn -->
+<div class="sec-header"><span class="sec-num">05</span><span class="sec-title">Last event before churn</span></div>
+<div class="card">
+  <div class="card-title">Last recorded event per user</div>
+  <div class="card-desc" id="u-churn-desc">What event each user's session ended on. Note: Application Pause is the dominant last event — the Meta OS paused or killed the app.</div>
+  <div class="churn-flow" id="u-churnFlow"></div>
+</div>
+
+<!-- Unity footer -->
+<div class="footer" style="margin-top:3rem">
+  <div class="footer-l">BRKER — Unity Events · Jun 2026</div>
+  <div class="footer-r">BRKER</div>
+</div>
+
+</div><!-- /tab-unity -->
+
+<!-- LIVE BANNER -->
+<div id="liveBanner" style="position:fixed;bottom:1.5rem;right:1.5rem;background:#111114;color:#fff;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:.6rem 1rem;border-radius:6px;display:flex;align-items:center;gap:8px;z-index:999;box-shadow:0 2px 12px rgba(0,0,0,.15)">
+  <span id="liveDot" style="width:7px;height:7px;border-radius:50%;background:#d97706;flex-shrink:0"></span>
+  <span id="liveText">Loading…</span>
+  <button onclick="fetchBoth()" style="margin-left:6px;background:none;border:1px solid rgba(255,255,255,.2);color:#fff;font-family:inherit;font-size:10px;padding:2px 7px;border-radius:3px;cursor:pointer">↻</button>
+</div>
 
 <script>
 const tc = '#7a7a85';
@@ -820,21 +983,341 @@ function applyFilterToData() {
   renderStaticSegments();
 }
 
+// ══════════════════════════════════════
+// TAB SWITCHING
+// ══════════════════════════════════════
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+  // Lazy-render Unity charts when first switching to that tab
+  if(name === 'unity' && UNITY_RAW_CSV && !UNITY_RENDERED) {
+    applyUnityFilter();
+    UNITY_RENDERED = true;
+  }
+}
+
+// ══════════════════════════════════════
+// UNITY EVENTS — data & render
+// ══════════════════════════════════════
+const UNITY_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQT5PD4JVg8l4P_EPMmE_VibHKvmxhcZeIjXmEjEMUD993fZ6iWbBhuRFCZg2TdoSQHpg91bfxqyo16/pub?gid=1419692428&single=true&output=csv';
+let UNITY_RAW_CSV = null;
+let UNITY_LAUNCH_TS = null;
+let UNITY_RENDERED = false;
+let uCharts = {};
+
+function destroyUChart(id) { if(uCharts[id]){ uCharts[id].destroy(); delete uCharts[id]; } }
+
+function parseUnityCSV(text, forcedLaunchTs) {
+  const lines = text.trim().split('\n').slice(1);
+  const rows = lines.map(l => {
+    const p = l.split(',');
+    return {
+      user_id:       p[0]?.trim(),
+      user_progress: p[1]?.trim(),
+      timestamp:     parseFloat(p[2]),
+      title:         p[3]?.trim(),
+      depth:         parseFloat(p[4]),
+      width:         parseFloat(p[5]),
+      fail_type:     p[6]?.trim(),
+      is_tutorial:   p[7]?.trim(),
+      level_id:      p[8]?.trim(),
+      level_name:    p[9]?.trim(),
+      tutorial_step: parseFloat(p[12])
+    };
+  }).filter(r => r.user_id && !isNaN(r.timestamp));
+  rows.sort((a,b) => a.user_id.localeCompare(b.user_id) || a.timestamp - b.timestamp);
+
+  const minTs = forcedLaunchTs || Math.min(...rows.map(r=>r.timestamp));
+  const maxTs = Math.max(...rows.map(r=>r.timestamp));
+  const users = [...new Set(rows.map(r=>r.user_id))];
+
+  // Guardian
+  const warnedUsers = [...new Set(rows.filter(r=>r.title==='Small Guardian Warning').map(r=>r.user_id))];
+  const startedUsers = [...new Set(rows.filter(r=>['Tutorial Step Started','Drill Started'].includes(r.title)).map(r=>r.user_id))];
+  const exitUsers = [...new Set(rows.filter(r=>['App Exit','Application Pause'].includes(r.title)).map(r=>r.user_id))];
+  const warnedStarted = warnedUsers.filter(u=>startedUsers.includes(u)).length;
+  const warnedNotStarted = warnedUsers.filter(u=>!startedUsers.includes(u)).length;
+  const warnedExited = warnedUsers.filter(u=>exitUsers.includes(u)).length;
+  const noWarning = users.filter(u=>!warnedUsers.includes(u)).length;
+
+  // Hand tracking
+  const htUsers = [...new Set(rows.filter(r=>r.title==='Hand Tracking Not Active').map(r=>r.user_id))];
+  const htExited = htUsers.filter(u=>exitUsers.includes(u)).length;
+
+  // Tutorial
+  const tutRows = rows.filter(r=>r.title==='Tutorial Step Started');
+  const tutUsers = [...new Set(tutRows.map(r=>r.user_id))];
+  const skippedUsers = [...new Set(rows.filter(r=>r.title==='Tutorial Skipped').map(r=>r.user_id))];
+  const lastStep = {};
+  tutRows.forEach(r=>{ if(!lastStep[r.user_id]||r.tutorial_step>lastStep[r.user_id]) lastStep[r.user_id]=r.tutorial_step; });
+  const tutCompleted = Object.values(lastStep).filter(s=>s===33).length;
+  const tutStepDist = {};
+  Object.values(lastStep).forEach(s=>{ tutStepDist[s]=(tutStepDist[s]||0)+1; });
+
+  // Tutorial drops (last step before exit)
+  const tutDropDist = {};
+  tutUsers.forEach(uid => {
+    const uRows = rows.filter(r=>r.user_id===uid);
+    const ls = lastStep[uid];
+    const hasExit = uRows.some(r=>['App Exit','Application Pause'].includes(r.title));
+    if(hasExit && ls !== 33) tutDropDist[ls] = (tutDropDist[ls]||0)+1;
+  });
+
+  // Tutorial fail types
+  const tutFailTypes = {};
+  rows.filter(r=>r.title==='Tutorial Step Failed').forEach(r=>{
+    if(r.fail_type) tutFailTypes[r.fail_type]=(tutFailTypes[r.fail_type]||0)+1;
+  });
+
+  // Drill fails
+  const drillFails = rows.filter(r=>r.title==='Drill Failed');
+  const drillFailTypes = {};
+  drillFails.forEach(r=>{ if(r.fail_type) drillFailTypes[r.fail_type]=(drillFailTypes[r.fail_type]||0)+1; });
+  const drillFailByLevel = {};
+  drillFails.forEach(r=>{ if(r.level_name) drillFailByLevel[r.level_name]=(drillFailByLevel[r.level_name]||0)+1; });
+
+  // Last event per user
+  const lastEvent = {};
+  rows.forEach(r=>{ lastEvent[r.user_id]=r.title; });
+  const lastEventDist = {};
+  Object.values(lastEvent).forEach(t=>{ lastEventDist[t]=(lastEventDist[t]||0)+1; });
+
+  return {
+    totalUsers: users.length,
+    warnedUsers: warnedUsers.length, warnedStarted, warnedNotStarted, warnedExited, noWarning,
+    htUsers: htUsers.length, htExited,
+    tutUsers: tutUsers.length, tutCompleted, skippedUsers: skippedUsers.length,
+    tutStepDist, tutDropDist, tutFailTypes, drillFailTypes, drillFailByLevel,
+    lastEventDist, _minTs: minTs, _maxTs: maxTs
+  };
+}
+
+function renderUnity(d) {
+  // KPIs
+  document.getElementById('u-kpi-users').textContent = d.totalUsers;
+  document.getElementById('u-kpi-guardian').textContent = d.warnedUsers;
+  document.getElementById('u-kpi-guardian-sub').textContent = Math.round(d.warnedUsers/d.totalUsers*100)+'% of users warned';
+  document.getElementById('u-kpi-blocked').textContent = d.warnedNotStarted;
+  document.getElementById('u-kpi-ht').textContent = d.htUsers;
+  document.getElementById('u-kpi-tut').textContent = d.tutCompleted;
+  document.getElementById('u-kpi-tut-sub').textContent = 'of '+d.tutUsers+' who started';
+  document.getElementById('u-tut-desc').textContent =
+    d.tutUsers+' users started. Only '+d.tutCompleted+' completed all 33 steps. '+d.skippedUsers+' skipped entirely.';
+
+  // Guardian doughnut
+  destroyUChart('u-guardianChart');
+  uCharts['u-guardianChart'] = new Chart(document.getElementById('u-guardianChart'), {
+    type:'doughnut',
+    data:{ labels:['Warned → never started','Warned → started anyway','No warning'],
+      datasets:[{ data:[d.warnedNotStarted, d.warnedStarted, d.noWarning],
+        backgroundColor:['#dc2626','#d97706','#16a34a'], borderWidth:0 }] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'bottom', labels:{ font:{family:'IBM Plex Mono',size:10}, color:tc, boxWidth:10, padding:12 } } } }
+  });
+
+  // Guardian table
+  const gtBody = document.querySelector('#u-guardian-table tbody');
+  if(gtBody) {
+    const rows2 = [
+      ['Warned → never started', d.warnedNotStarted, Math.round(d.warnedNotStarted/d.warnedUsers*100), '#dc2626'],
+      ['Warned → started anyway', d.warnedStarted, Math.round(d.warnedStarted/d.warnedUsers*100), '#d97706'],
+      ['No warning → started normally', d.noWarning, null, '#16a34a'],
+    ];
+    gtBody.innerHTML = rows2.map(([label,n,pct,col])=>`
+      <tr><td>${label}</td><td class="mono" style="color:${col}">${n}</td>
+      <td class="mono">${pct!=null?pct+'%':'—'}</td>
+      <td><div class="inline-bar-wrap"><div class="inline-bar" style="width:${pct||Math.round(n/d.totalUsers*100)}%;background:${col}"></div></div></td></tr>
+    `).join('');
+  }
+
+  // Hand tracking chart
+  destroyUChart('u-htChart');
+  uCharts['u-htChart'] = new Chart(document.getElementById('u-htChart'), {
+    type:'bar',
+    data:{ labels:['Had tracking issue','Exited after','No issue'],
+      datasets:[{ data:[d.htUsers, d.htExited, d.totalUsers-d.htUsers],
+        backgroundColor:['#d97706','#dc2626','#16a34a'], borderRadius:4 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{ x:{grid:{color:gc},ticks:{color:tc}}, y:{grid:{color:gc},ticks:{color:tc},min:0} } }
+  });
+
+  // Friction table
+  const ftBody = document.querySelector('#u-friction-table tbody');
+  if(ftBody) {
+    ftBody.innerHTML = `
+      <tr><td>Small guardian (room too small)</td><td class="mono">${d.warnedUsers}</td><td class="mono red">${d.warnedExited}</td></tr>
+      <tr><td>Hand tracking not active</td><td class="mono">${d.htUsers}</td><td class="mono red">${d.htExited}</td></tr>
+      <tr><td>No technical issues</td><td class="mono green">${d.noWarning}</td><td class="mono">—</td></tr>
+    `;
+  }
+
+  // Tutorial funnel
+  const tutEl = document.getElementById('u-tutFunnel');
+  tutEl.innerHTML = '';
+  const tutSteps = [1,2,3,4,5,8,11,14,33];
+  const maxN = d.tutUsers || 1;
+  tutSteps.forEach(step => {
+    const n = d.tutStepDist[step] || 0;
+    const pct = Math.round(n/maxN*100);
+    const col = step===33?'#16a34a':n<5?'#dc2626':n<15?'#d97706':'#2563eb';
+    const note = step===33?'completed ✓':step===999?'repeat warning':'';
+    const row = document.createElement('div');
+    row.className='tut-row';
+    row.innerHTML=`<span class="tut-label">Step ${step}</span>
+      <div class="tut-bar-wrap"><div class="tut-bar" style="width:${pct}%;background:${col}"></div></div>
+      <span class="tut-n" style="color:${col}">${n}</span>
+      ${note?`<span class="tut-note">${note}</span>`:''}`;
+    tutEl.appendChild(row);
+  });
+  // step 999
+  const n999 = d.tutStepDist[999]||0;
+  const pct999 = Math.round(n999/maxN*100);
+  const r999 = document.createElement('div'); r999.className='tut-row';
+  r999.innerHTML=`<span class="tut-label">Step 999</span>
+    <div class="tut-bar-wrap"><div class="tut-bar" style="width:${pct999}%;background:#d97706"></div></div>
+    <span class="tut-n" style="color:#d97706">${n999}</span>
+    <span class="tut-note">repeat / error</span>`;
+  tutEl.appendChild(r999);
+
+  // Tutorial fail chart
+  destroyUChart('u-tutFailChart');
+  const tfLabels = Object.keys(d.tutFailTypes);
+  const tfData   = Object.values(d.tutFailTypes);
+  uCharts['u-tutFailChart'] = new Chart(document.getElementById('u-tutFailChart'), {
+    type:'bar', data:{ labels:tfLabels, datasets:[{ data:tfData,
+      backgroundColor:['#dc2626','#d97706','#ea580c','#b0b0b8'], borderRadius:4 }] },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{ x:{grid:{color:gc},ticks:{color:tc,font:{family:'IBM Plex Mono',size:10}}},
+               y:{grid:{display:false},ticks:{color:tc,font:{family:'IBM Plex Mono',size:10}}} } }
+  });
+
+  // Tutorial drop chart
+  destroyUChart('u-tutDropChart');
+  const dropKeys = Object.keys(d.tutDropDist).map(Number).sort((a,b)=>a-b);
+  const dropVals = dropKeys.map(k=>d.tutDropDist[k]);
+  const dropColors = dropKeys.map(k=>k===999?'#dc2626':dropVals[dropKeys.indexOf(k)]>=5?'#dc2626':dropVals[dropKeys.indexOf(k)]>=2?'#d97706':'#b0b0b8');
+  uCharts['u-tutDropChart'] = new Chart(document.getElementById('u-tutDropChart'), {
+    type:'bar', data:{ labels:dropKeys.map(k=>'Step '+k), datasets:[{ data:dropVals,
+      backgroundColor:dropColors, borderRadius:4 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{ x:{grid:{color:gc},ticks:{color:tc}}, y:{grid:{color:gc},ticks:{color:tc},min:0} } }
+  });
+
+  // Drill fail type doughnut
+  destroyUChart('u-drillFailTypeChart');
+  const dftLabels = Object.keys(d.drillFailTypes);
+  const dftData   = Object.values(d.drillFailTypes);
+  const dftColors = ['#dc2626','#d97706','#7c3aed','#2563eb','#2563ebaa','#b0b0b8'];
+  uCharts['u-drillFailTypeChart'] = new Chart(document.getElementById('u-drillFailTypeChart'), {
+    type:'doughnut', data:{ labels:dftLabels,
+      datasets:[{ data:dftData, backgroundColor:dftColors.slice(0,dftLabels.length), borderWidth:0 }] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'bottom', labels:{ font:{family:'IBM Plex Mono',size:10}, color:tc, boxWidth:10, padding:10 } } } }
+  });
+
+  // Drill fail by level bar
+  destroyUChart('u-drillFailLevelChart');
+  const dflEntries = Object.entries(d.drillFailByLevel).sort((a,b)=>b[1]-a[1]);
+  uCharts['u-drillFailLevelChart'] = new Chart(document.getElementById('u-drillFailLevelChart'), {
+    type:'bar', data:{ labels:dflEntries.map(e=>e[0]), datasets:[{ data:dflEntries.map(e=>e[1]),
+      backgroundColor:'rgba(124,58,237,.65)', borderRadius:3 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{ x:{grid:{color:gc},ticks:{color:tc,font:{size:10}}}, y:{grid:{color:gc},ticks:{color:tc},min:0} } }
+  });
+
+  // Churn flow
+  const churnEl = document.getElementById('u-churnFlow');
+  churnEl.innerHTML = '';
+  const churnEntries = Object.entries(d.lastEventDist).sort((a,b)=>b[1]-a[1]);
+  const churnMax = churnEntries[0]?.[1] || 1;
+  const churnCols = {
+    'App Exit':'#16a34a','Application Pause':'#dc2626',
+    'User Boundary Dimensions':'#dc2626','Small Guardian Warning':'#dc2626',
+    'Tutorial Step Started':'#d97706','Drill Failed':'#d97706',
+    'Drill Started':'#d97706','Hand Tracking Not Active':'#dc2626',
+    'Tutorial Skipped':'#b0b0b8'
+  };
+  churnEntries.forEach(([ev,n])=>{
+    const col = churnCols[ev]||'#b0b0b8';
+    const pct = Math.round(n/churnMax*100);
+    const row = document.createElement('div'); row.className='churn-row';
+    row.innerHTML=`<div class="churn-label"><span class="event-tag">${ev}</span></div>
+      <div class="churn-bar-wrap"><div class="churn-bar" style="width:${pct}%;background:${col}"></div></div>
+      <span class="churn-count" style="color:${col}">${n}</span>`;
+    churnEl.appendChild(row);
+  });
+}
+
+// ── Unity filter ──
+async function fetchUnity() {
+  try {
+    const res = await fetch(UNITY_URL);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const csv = await res.text();
+    UNITY_RAW_CSV = csv;
+    const full = parseUnityCSV(csv);
+    UNITY_LAUNCH_TS = full._minTs;
+    const fromEl = document.getElementById('uFilterFrom');
+    const toEl   = document.getElementById('uFilterTo');
+    if(!fromEl.value) {
+      fromEl.value = isoDate(full._minTs);
+      toEl.value   = isoDate(full._maxTs);
+    }
+    if(document.getElementById('tab-unity').classList.contains('active')) {
+      applyUnityFilter();
+      UNITY_RENDERED = true;
+    }
+  } catch(e) { console.warn('Unity fetch failed:', e.message); }
+}
+
+function applyUnityFilter() {
+  if(!UNITY_RAW_CSV) return;
+  const fromVal = document.getElementById('uFilterFrom').value;
+  const toVal   = document.getElementById('uFilterTo').value;
+  if(!fromVal || !toVal) { renderUnity(parseUnityCSV(UNITY_RAW_CSV)); return; }
+  const fromTs = dateToTs(fromVal, false);
+  const toTs   = dateToTs(toVal, true);
+  const lines = UNITY_RAW_CSV.trim().split('\n');
+  const header = lines[0];
+  const filtered = lines.slice(1).filter(l => {
+    const ts = parseFloat(l.split(',')[2]);
+    return !isNaN(ts) && ts >= fromTs && ts <= toTs;
+  });
+  if(filtered.length === 0) { document.getElementById('uFilterInfo').textContent='No data in range'; return; }
+  const d = parseUnityCSV([header,...filtered].join('\n'), UNITY_LAUNCH_TS);
+  document.getElementById('uFilterInfo').textContent = filtered.length+' events · '+d.totalUsers+' users';
+  renderUnity(d);
+}
+
+function resetUnityFilter() {
+  if(!UNITY_RAW_CSV || !UNITY_LAUNCH_TS) return;
+  const full = parseUnityCSV(UNITY_RAW_CSV);
+  document.getElementById('uFilterFrom').value = isoDate(full._minTs);
+  document.getElementById('uFilterTo').value   = isoDate(full._maxTs);
+  document.getElementById('uFilterInfo').textContent = '';
+  renderUnity(full);
+}
+
+// ── Combined fetch + init ──
+async function fetchBoth() {
+  const dot = document.getElementById('liveDot');
+  const txt = document.getElementById('liveText');
+  dot.style.background = '#d97706';
+  txt.textContent = 'Fetching…';
+  await Promise.all([fetchLive(), fetchUnity()]);
+  dot.style.background = '#16a34a';
+  txt.textContent = 'Live · '+new Date().toLocaleTimeString();
+}
+
 // ── Init ──
 render(STATIC);
 renderStaticSegments();
-fetchLive();
+fetchBoth();
 
 // ── Auto-refresh every 5 minutes ──
-setInterval(fetchLive, 5 * 60 * 1000);
-
-// ── Init ──
-render(STATIC);
-renderStaticSegments();
-fetchLive();
-
-// ── Auto-refresh every 5 minutes ──
-setInterval(fetchLive, 5 * 60 * 1000);
+setInterval(fetchBoth, 5 * 60 * 1000);
 </script>
 </body>
 </html>
