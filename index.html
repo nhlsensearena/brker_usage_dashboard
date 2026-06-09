@@ -407,7 +407,7 @@ h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0
   <div class="card">
     <div class="card-title">Guardian warning — session outcome</div>
     <div class="card-desc">Share of warned users who still proceeded vs. exited immediately.</div>
-    <div class="chart-wrap" style="height:210px"><canvas id="u-guardianChart"></canvas></div>
+    <div class="chart-wrap" style="height:210px"><canvas id="u-guardianChart" height="200"></canvas></div>
   </div>
   <div class="card">
     <div class="card-title">Guardian warning — detailed breakdown</div>
@@ -423,7 +423,7 @@ h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0
 <div class="card">
   <div class="card-title">Guardian size distribution (depth × width, meters)</div>
   <div class="card-desc">Recorded at login. Minimum usable space for the game is approx. 1.5m × 1.5m.</div>
-  <div class="chart-wrap" style="height:260px"><canvas id="u-guardianSizeChart"></canvas></div>
+  <div class="chart-wrap" style="height:260px"><canvas id="u-guardianSizeChart" height="200"></canvas></div>
 </div>
 
 <!-- S02: Hand tracking -->
@@ -432,7 +432,7 @@ h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0
   <div class="card">
     <div class="card-title">Hand tracking — session outcome</div>
     <div class="card-desc">Users who hit the "Hand Tracking Not Active" warning and their subsequent behaviour.</div>
-    <div class="chart-wrap" style="height:190px"><canvas id="u-htChart"></canvas></div>
+    <div class="chart-wrap" style="height:190px"><canvas id="u-htChart" height="200"></canvas></div>
   </div>
   <div class="card">
     <div class="card-title">Technical friction summary</div>
@@ -455,13 +455,13 @@ h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0
   <div class="card">
     <div class="card-title">Tutorial Step Failed — error types</div>
     <div class="card-desc">Types of errors causing tutorial step failures.</div>
-    <div class="chart-wrap" style="height:210px"><canvas id="u-tutFailChart"></canvas></div>
+    <div class="chart-wrap" style="height:210px"><canvas id="u-tutFailChart" height="200"></canvas></div>
   </div>
 </div>
 <div class="card">
   <div class="card-title">Tutorial step dropout — last step before exit</div>
   <div class="card-desc">Step 999 = repeat warning (error correction shown to user). Steps 2 and 999 are the biggest drop points.</div>
-  <div class="chart-wrap" style="height:210px"><canvas id="u-tutDropChart"></canvas></div>
+  <div class="chart-wrap" style="height:210px"><canvas id="u-tutDropChart" height="200"></canvas></div>
 </div>
 
 <!-- S04: Drill failures -->
@@ -470,12 +470,12 @@ h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0
   <div class="card">
     <div class="card-title">Drill Failed — fail type breakdown</div>
     <div class="card-desc">All non-tutorial drill failures. Time-outs dominate.</div>
-    <div class="chart-wrap" style="height:230px"><canvas id="u-drillFailTypeChart"></canvas></div>
+    <div class="chart-wrap" style="height:230px"><canvas id="u-drillFailTypeChart" height="200"></canvas></div>
   </div>
   <div class="card">
     <div class="card-title">Drill failures per level</div>
     <div class="card-desc">L1 accounts for the large majority of failures.</div>
-    <div class="chart-wrap" style="height:230px"><canvas id="u-drillFailLevelChart"></canvas></div>
+    <div class="chart-wrap" style="height:230px"><canvas id="u-drillFailLevelChart" height="200"></canvas></div>
   </div>
 </div>
 
@@ -998,10 +998,16 @@ function switchTab(name, btn) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   btn.classList.add('active');
-  // Lazy-render Unity charts when first switching to that tab
-  if(name === 'unity' && UNITY_RAW_CSV && !UNITY_RENDERED) {
-    applyUnityFilter();
-    UNITY_RENDERED = true;
+
+  if(name === 'unity') {
+    // Always re-render after tab becomes visible so Chart.js can measure canvas size
+    requestAnimationFrame(() => {
+      if(UNITY_RAW_CSV) {
+        applyUnityFilter();
+      }
+      // Resize any already-created unity charts (handles repeated tab switches)
+      Object.values(uCharts).forEach(c => { try { c.resize(); } catch(e) {} });
+    });
   }
 }
 
@@ -1011,7 +1017,6 @@ function switchTab(name, btn) {
 const UNITY_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQT5PD4JVg8l4P_EPMmE_VibHKvmxhcZeIjXmEjEMUD993fZ6iWbBhuRFCZg2TdoSQHpg91bfxqyo16/pub?gid=1419692428&single=true&output=csv';
 let UNITY_RAW_CSV = null;
 let UNITY_LAUNCH_TS = null;
-let UNITY_RENDERED = false;
 let uCharts = {};
 
 function destroyUChart(id) { if(uCharts[id]){ uCharts[id].destroy(); delete uCharts[id]; } }
@@ -1342,7 +1347,6 @@ async function fetchUnity() {
     }
     if(document.getElementById('tab-unity').classList.contains('active')) {
       applyUnityFilter();
-      UNITY_RENDERED = true;
     }
   } catch(e) { console.warn('Unity fetch failed:', e.message); }
 }
