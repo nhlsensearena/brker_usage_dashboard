@@ -1062,17 +1062,20 @@ function parseUnityCSV(text, forcedLaunchTs) {
   // Max step per user (ignoring 999 for funnel)
   const maxStepPerUser = {};
   tutRows.forEach(r=>{
-    const s = r.tutorial_step;
-    if(s === 999) return; // 999 is error repeat, not progression
+    const s = Math.round(r.tutorial_step); // parseFloat("33.0") = 33.0, Math.round ensures integer
+    if(s === 999) return;
     if(!maxStepPerUser[r.user_id] || s > maxStepPerUser[r.user_id]) maxStepPerUser[r.user_id] = s;
   });
-  const tutCompleted = Object.values(maxStepPerUser).filter(s=>s===33).length;
+  const tutCompleted = Object.values(maxStepPerUser).filter(s => Math.round(s) === 33).length;
+  // Debug: log completed users
+  console.log('[TUT] maxStepPerUser dist:', Object.values(maxStepPerUser).reduce((acc,s)=>{acc[s]=(acc[s]||0)+1;return acc;},{}));
+  console.log('[TUT] tutCompleted:', tutCompleted, '| tutFunnel[33] will be:', Object.values(maxStepPerUser).filter(s=>Math.round(s)>=33).length);
 
   // Tutorial funnel: cumulative — how many users reached AT LEAST step N
   const tutFunnelSteps = [1,2,3,4,5,8,11,14,33];
   const tutFunnel = {};
   tutFunnelSteps.forEach(s => {
-    tutFunnel[s] = Object.values(maxStepPerUser).filter(ms => ms >= s).length;
+    tutFunnel[s] = Object.values(maxStepPerUser).filter(ms => Math.round(ms) >= s).length;
   });
   // Step 999 users (separately — error repeat, parallel state)
   const step999Users = [...new Set(tutRows.filter(r=>r.tutorial_step===999).map(r=>r.user_id))].length;
