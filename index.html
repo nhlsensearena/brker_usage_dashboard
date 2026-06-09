@@ -1182,7 +1182,7 @@ function renderUnity(d) {
   const gsCtx = document.getElementById('u-guardianSizeChart');
   if(gsCtx) {
     // Use raw guardian dimension data
-    const gdData = rows
+    const gdData = d.rows
       .filter(r=>r.title==='User Boundary Dimensions' && !isNaN(r.depth) && !isNaN(r.width))
       .map(r=>({x: Math.round(r.depth*100)/100, y: Math.round(r.width*100)/100}));
     uCharts['u-guardianSizeChart'] = new Chart(gsCtx, {
