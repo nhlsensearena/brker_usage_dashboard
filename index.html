@@ -393,12 +393,13 @@ h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0
 </div>
 
 <!-- Unity KPIs -->
-<div class="kpi-row" id="u-kpi-row">
+<div class="kpi-row" id="u-kpi-row" style="grid-template-columns:repeat(6,1fr)">
   <div class="kpi"><div class="kpi-label">Total users</div><div class="kpi-value blue" id="u-kpi-users">119</div><div class="kpi-sub">unique players</div></div>
-  <div class="kpi"><div class="kpi-label">Small guardian</div><div class="kpi-value red" id="u-kpi-guardian">77</div><div class="kpi-sub" id="u-kpi-guardian-sub">65% of users warned</div></div>
-  <div class="kpi"><div class="kpi-label">Blocked by guardian</div><div class="kpi-value red" id="u-kpi-blocked">55</div><div class="kpi-sub">never started</div></div>
-  <div class="kpi"><div class="kpi-label">Hand tracking issue</div><div class="kpi-value amber" id="u-kpi-ht">24</div><div class="kpi-sub">20% of users</div></div>
-  <div class="kpi"><div class="kpi-label">Tutorial completed</div><div class="kpi-value green" id="u-kpi-tut">3</div><div class="kpi-sub" id="u-kpi-tut-sub">of 47 who started</div></div>
+  <div class="kpi"><div class="kpi-label">Small guardian</div><div class="kpi-value red" id="u-kpi-guardian">77</div><div class="kpi-sub" id="u-kpi-guardian-sub">65% warned</div></div>
+  <div class="kpi"><div class="kpi-label">Blocked by guardian</div><div class="kpi-value red" id="u-kpi-blocked">55</div><div class="kpi-sub" id="u-kpi-blocked-sub">46% of base</div></div>
+  <div class="kpi"><div class="kpi-label">Hand tracking issue</div><div class="kpi-value amber" id="u-kpi-ht">24</div><div class="kpi-sub" id="u-kpi-ht-sub">20% of users</div></div>
+  <div class="kpi"><div class="kpi-label">HT churn</div><div class="kpi-value red" id="u-kpi-ht-churn">11</div><div class="kpi-sub" id="u-kpi-ht-churn-sub">9% of base</div></div>
+  <div class="kpi"><div class="kpi-label">Reached drill</div><div class="kpi-value green" id="u-kpi-drill">49</div><div class="kpi-sub" id="u-kpi-drill-sub">41% of base</div></div>
 </div>
 
 <!-- S01: Guardian -->
@@ -440,6 +441,19 @@ h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0
     <table class="stat-table" style="margin-top:.25rem" id="u-friction-table">
       <thead><tr><th>Issue</th><th>Users</th><th>Churned after</th></tr></thead>
       <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- HT split: tutorial vs drill -->
+<div class="card" style="margin-top:0">
+  <div class="card-title">Hand tracking issue — context: tutorial vs. drill</div>
+  <div class="card-desc">Whether the "Hand Tracking Not Active" warning appeared while user was in the tutorial flow or during a drill attempt (based on prior events in session).</div>
+  <div class="two-col">
+    <div class="chart-wrap" style="height:200px"><canvas id="u-htSplitChart" height="200"></canvas></div>
+    <table class="stat-table" style="align-self:center">
+      <thead><tr><th>Context</th><th>Users</th><th>Churned after</th></tr></thead>
+      <tbody id="u-ht-split-table"></tbody>
     </table>
   </div>
 </div>
@@ -1054,17 +1068,42 @@ function parseUnityCSV(text, forcedLaunchTs) {
   const warnedExited = warnedUsers.filter(u=>exitUsers.includes(u)).length;
   const noWarning = users.filter(u=>!warnedUsers.includes(u)).length;
 
-  // Hand tracking — only users who ever had Drill Started
+  // Hand tracking
   const drillStartedUsers = [...new Set(rows.filter(r=>r.title==='Drill Started').map(r=>r.user_id))];
   const htUsers = [...new Set(rows.filter(r=>r.title==='Hand Tracking Not Active').map(r=>r.user_id))];
   const htWithDrill = htUsers.filter(u=>drillStartedUsers.includes(u));
-  // Churned = had HT event AND no Drill Started after last HT event
+
+  // HT churn: had HT then no Drill Started or Tutorial Step Started after
   let htChurned = 0;
-  htWithDrill.forEach(uid => {
+  htUsers.forEach(uid => {
     const uRows = rows.filter(r=>r.user_id===uid).sort((a,b)=>a.timestamp-b.timestamp);
     const lastHtTs = uRows.filter(r=>r.title==='Hand Tracking Not Active').slice(-1)[0]?.timestamp || 0;
-    const drillAfter = uRows.filter(r=>r.timestamp > lastHtTs && r.title==='Drill Started');
-    if(drillAfter.length === 0) htChurned++;
+    const after = uRows.filter(r=>r.timestamp > lastHtTs);
+    const continued = after.some(r=>r.title==='Drill Started'||r.title==='Tutorial Step Started');
+    if(!continued) htChurned++;
+  });
+
+  // HT context: tutorial vs drill (based on what happened before first HT event)
+  let htInTutorial = 0, htInDrill = 0;
+  htUsers.forEach(uid => {
+    const uRows = rows.filter(r=>r.user_id===uid).sort((a,b)=>a.timestamp-b.timestamp);
+    const firstHtTs = uRows.filter(r=>r.title==='Hand Tracking Not Active')[0]?.timestamp || 0;
+    const before = uRows.filter(r=>r.timestamp < firstHtTs);
+    const hadDrillBefore = before.some(r=>r.title==='Drill Started');
+    if(hadDrillBefore) htInDrill++; else htInTutorial++;
+  });
+
+  // HT churn split
+  let htTutChurned = 0, htDrillChurned = 0;
+  htUsers.forEach(uid => {
+    const uRows = rows.filter(r=>r.user_id===uid).sort((a,b)=>a.timestamp-b.timestamp);
+    const firstHtTs = uRows.filter(r=>r.title==='Hand Tracking Not Active')[0]?.timestamp || 0;
+    const lastHtTs  = uRows.filter(r=>r.title==='Hand Tracking Not Active').slice(-1)[0]?.timestamp || 0;
+    const before = uRows.filter(r=>r.timestamp < firstHtTs);
+    const after  = uRows.filter(r=>r.timestamp > lastHtTs);
+    const hadDrillBefore = before.some(r=>r.title==='Drill Started');
+    const continued = after.some(r=>r.title==='Drill Started'||r.title==='Tutorial Step Started');
+    if(!continued) { if(hadDrillBefore) htDrillChurned++; else htTutChurned++; }
   });
 
   // Tutorial
@@ -1079,7 +1118,7 @@ function parseUnityCSV(text, forcedLaunchTs) {
     if(!maxStepPerUser[r.user_id] || s > maxStepPerUser[r.user_id]) maxStepPerUser[r.user_id] = s;
   });
   const tutCompleted = Object.values(maxStepPerUser).filter(s => s === 33).length;
-  const tutFunnelSteps = [1,2,3,4,5,8,11,14,33];
+  const tutFunnelSteps = [1,7,11,13,15,17,19,21,26,28,33];
   const tutFunnel = {};
   tutFunnelSteps.forEach(s => { tutFunnel[s] = Object.values(maxStepPerUser).filter(ms => ms >= s).length; });
 
@@ -1130,6 +1169,7 @@ function parseUnityCSV(text, forcedLaunchTs) {
     totalUsers: users.length, rows,
     warnedUsers: warnedUsers.length, warnedStarted, warnedNotStarted, warnedExited, noWarning,
     htUsers: htUsers.length, htWithDrill: htWithDrill.length, htChurned,
+    htInTutorial, htInDrill, htTutChurned, htDrillChurned,
     drillStartedUsers: drillStartedUsers.length,
     tutUsers: tutUsers.length, tutCompleted, skippedUsers: skippedUsers.length,
     tutFunnel, tutFunnelSteps, step999Users,
@@ -1140,13 +1180,18 @@ function parseUnityCSV(text, forcedLaunchTs) {
 
 function renderUnity(d) {
   // KPIs
+  const base = d.totalUsers || 1;
   document.getElementById('u-kpi-users').textContent = d.totalUsers;
   document.getElementById('u-kpi-guardian').textContent = d.warnedUsers;
-  document.getElementById('u-kpi-guardian-sub').textContent = Math.round(d.warnedUsers/d.totalUsers*100)+'% of users warned';
+  document.getElementById('u-kpi-guardian-sub').textContent = Math.round(d.warnedUsers/base*100)+'% warned';
   document.getElementById('u-kpi-blocked').textContent = d.warnedNotStarted;
+  document.getElementById('u-kpi-blocked-sub').textContent = Math.round(d.warnedNotStarted/base*100)+'% of base';
   document.getElementById('u-kpi-ht').textContent = d.htUsers;
-  document.getElementById('u-kpi-tut').textContent = d.tutCompleted;
-  document.getElementById('u-kpi-tut-sub').textContent = 'of '+d.tutUsers+' who started';
+  document.getElementById('u-kpi-ht-sub').textContent = Math.round(d.htUsers/base*100)+'% of users';
+  document.getElementById('u-kpi-ht-churn').textContent = d.htChurned;
+  document.getElementById('u-kpi-ht-churn-sub').textContent = Math.round(d.htChurned/base*100)+'% of base';
+  document.getElementById('u-kpi-drill').textContent = d.drillStartedUsers;
+  document.getElementById('u-kpi-drill-sub').textContent = Math.round(d.drillStartedUsers/base*100)+'% of base';
   document.getElementById('u-tut-desc').textContent =
     d.tutUsers+' users started. '+d.tutCompleted+' completed all 33 steps. '+d.skippedUsers+' skipped.';
 
@@ -1223,20 +1268,57 @@ function renderUnity(d) {
     <tr><td>Hand tracking not active</td><td class="mono">${d.htWithDrill}</td><td class="mono red">${d.htChurned}</td></tr>
   `;
 
+  // HT split chart
+  destroyUChart('u-htSplitChart');
+  const htsCtx = document.getElementById('u-htSplitChart');
+  if(htsCtx) uCharts['u-htSplitChart'] = new Chart(htsCtx, {
+    type: 'bar',
+    data: {
+      labels: ['In tutorial flow', 'During drill'],
+      datasets: [
+        { label: 'Had HT issue', data: [d.htInTutorial, d.htInDrill],
+          backgroundColor: ['rgba(217,119,6,.6)','rgba(217,119,6,.6)'], borderRadius: 4 },
+        { label: 'Churned after', data: [d.htTutChurned, d.htDrillChurned],
+          backgroundColor: ['#dc2626','#dc2626'], borderRadius: 4 }
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'bottom', labels:{font:{family:'IBM Plex Mono',size:10},color:tc,boxWidth:10,padding:10} } },
+      scales:{ x:{grid:{color:gc},ticks:{color:tc}}, y:{grid:{color:gc},ticks:{color:tc},min:0} }
+    }
+  });
+
+  // HT split table
+  const htSplitTBody = document.getElementById('u-ht-split-table');
+  if(htSplitTBody) htSplitTBody.innerHTML = `
+    <tr><td>In tutorial flow</td><td class="mono">${d.htInTutorial}</td><td class="mono red">${d.htTutChurned}</td></tr>
+    <tr><td>During drill</td><td class="mono">${d.htInDrill}</td><td class="mono red">${d.htDrillChurned}</td></tr>
+  `;
+
   // Tutorial funnel — cumulative: how many reached AT LEAST step N
   const tutEl = document.getElementById('u-tutFunnel');
   if(tutEl) {
     tutEl.innerHTML = '';
     const maxN = d.tutFunnel[1] || 1;
+    const stepLabels = {
+      1:'Started tutorial', 7:'Waiting to start L1', 11:'Completed L1',
+      13:'Waiting to start L2', 15:'Completed L2', 17:'Waiting to start L3',
+      19:'Completed L3', 21:'Waiting to start L4', 26:'Completed L4',
+      28:'Waiting to start L5', 33:'Completed L5 — end'
+    };
     d.tutFunnelSteps.forEach(step => {
       const n = d.tutFunnel[step] || 0;
       const pct = Math.round(n/maxN*100);
       const col = step===33?'#16a34a':pct<40?'#dc2626':pct<70?'#d97706':'#2563eb';
       const row = document.createElement('div'); row.className='tut-row';
-      row.innerHTML=`<span class="tut-label">Step ${step}</span>
-        <div class="tut-bar-wrap"><div class="tut-bar" style="width:${pct}%;background:${col}"></div></div>
-        <span class="tut-n" style="color:${col}">${n}</span>
-        ${step===33?'<span class="tut-note">✓ completed</span>':''}`;
+      row.style.cssText='margin-bottom:5px';
+      row.innerHTML=`<span class="tut-label" style="width:80px;font-size:10px">S${step}</span>
+        <div style="flex:1">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:2px">${stepLabels[step]||''}</div>
+          <div class="tut-bar-wrap"><div class="tut-bar" style="width:${pct}%;background:${col}"></div></div>
+        </div>
+        <span class="tut-n" style="color:${col};margin-left:8px">${n}</span>
+        ${step===33?'<span class="tut-note" style="margin-left:4px">✓</span>':''}`;
       tutEl.appendChild(row);
     });
     const note999 = document.createElement('div');
