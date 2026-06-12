@@ -423,7 +423,7 @@ h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0
 <!-- Guardian size scatter -->
 <div class="card">
   <div class="card-title">Guardian size distribution (depth × width, meters)</div>
-  <div class="card-desc">Recorded at login. Minimum usable space for the game is approx. 1.5m × 1.5m.</div>
+  <div class="card-desc">Recorded at login. Minimum usable space is 2m × 2m. Red = at least one dimension below minimum.</div>
   <div class="chart-wrap" style="height:260px"><canvas id="u-guardianSizeChart" height="200"></canvas></div>
 </div>
 
@@ -432,7 +432,7 @@ h1 { font-size: 3rem; font-weight: 600; letter-spacing: -.03em; line-height: 1.0
 <div class="two-col">
   <div class="card">
     <div class="card-title">Hand tracking — session outcome</div>
-    <div class="card-desc">Users who hit the "Hand Tracking Not Active" warning and their subsequent behaviour.</div>
+    <div class="card-desc">24 users encountered the "Hand Tracking Not Active" warning. 13 solved it and continued; 11 churned.</div>
     <div class="chart-wrap" style="height:190px"><canvas id="u-htChart" height="200"></canvas></div>
   </div>
   <div class="card">
@@ -1230,16 +1230,37 @@ function renderUnity(d) {
     const gdData = d.rows
       .filter(r=>r.title==='User Boundary Dimensions' && !isNaN(r.depth) && !isNaN(r.width))
       .map(r=>({x: Math.round(r.depth*100)/100, y: Math.round(r.width*100)/100}));
+    // Compute % below 2x2
+    const totalGd = gdData.length;
+    const below2x2 = gdData.filter(p=>p.x<2||p.y<2).length;
+    const pctBelow = totalGd ? Math.round(below2x2/totalGd*100) : 0;
+    const pctOk    = 100 - pctBelow;
+
+    // Color points: red if either dim < 2, green otherwise
+    const gdColored = gdData.map(p=>({...p, color: (p.x<2||p.y<2)?'rgba(220,38,38,.5)':'rgba(22,163,74,.4)'}));
+
     uCharts['u-guardianSizeChart'] = new Chart(gsCtx, {
       type:'scatter',
       data:{ datasets:[
-        { label:'Guardian size', data:gdData, backgroundColor:'rgba(37,99,235,.35)', pointRadius:5 },
-        { label:'1.5m threshold', data:[{x:0,y:1.5},{x:12,y:1.5}], type:'line',
+        { label:'Below 2×2m', data:gdData.filter(p=>p.x<2||p.y<2),
+          backgroundColor:'rgba(220,38,38,.45)', pointRadius:5 },
+        { label:'OK (≥2×2m)', data:gdData.filter(p=>p.x>=2&&p.y>=2),
+          backgroundColor:'rgba(22,163,74,.45)', pointRadius:5 },
+        { label:'Min depth 2m', data:[{x:2,y:0},{x:2,y:12}], type:'line',
+          borderColor:'#dc2626', borderWidth:1.5, borderDash:[4,3], pointRadius:0 },
+        { label:'Min width 2m', data:[{x:0,y:2},{x:12,y:2}], type:'line',
           borderColor:'#dc2626', borderWidth:1.5, borderDash:[4,3], pointRadius:0 }
       ]},
       options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{ display:false },
-          tooltip:{ callbacks:{ label: ctx => ctx.dataset.label==='Guardian size' ? `depth ${ctx.raw.x}m × width ${ctx.raw.y}m` : '1.5m min' }}
+        plugins:{
+          legend:{ display:false },
+          tooltip:{ callbacks:{ label: ctx => {
+            if(ctx.dataset.label.includes('Min')) return null;
+            return `depth ${ctx.raw.x}m × width ${ctx.raw.y}m`;
+          }}},
+          title:{ display:true,
+            text: `${pctBelow}% of guardian events below 2×2m minimum  |  ${pctOk}% OK`,
+            color:tc, font:{family:'IBM Plex Mono',size:10}, align:'start', padding:{bottom:8} }
         },
         scales:{
           x:{ grid:{color:gc}, ticks:{color:tc}, title:{display:true,text:'depth (m)',color:tc,font:{size:10}}, min:0, max:12 },
@@ -1252,14 +1273,18 @@ function renderUnity(d) {
   // Hand tracking — drill_started users only; churned = HT then no more Drill Started
   destroyUChart('u-htChart');
   const htCtx = document.getElementById('u-htChart');
-  if(htCtx) uCharts['u-htChart'] = new Chart(htCtx, {
-    type:'bar',
-    data:{ labels:['Had HT issue','Churned after HT','No HT issue (had drill)'],
-      datasets:[{ data:[d.htWithDrill, d.htChurned, d.drillStartedUsers - d.htWithDrill],
-        backgroundColor:['#d97706','#dc2626','#16a34a'], borderRadius:4 }] },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
-      scales:{ x:{grid:{color:gc},ticks:{color:tc}}, y:{grid:{color:gc},ticks:{color:tc},min:0} } }
-  });
+  if(htCtx) {
+    const htSolved  = d.htUsers - d.htChurned;
+    const htNoIssue = d.totalUsers - d.htUsers;
+    uCharts['u-htChart'] = new Chart(htCtx, {
+      type:'doughnut',
+      data:{ labels:['Had issue + solved','Had issue + churned','No issue'],
+        datasets:[{ data:[htSolved, d.htChurned, htNoIssue],
+          backgroundColor:['#d97706','#dc2626','#16a34a'], borderWidth:0 }] },
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ position:'bottom', labels:{font:{family:'IBM Plex Mono',size:10},color:tc,boxWidth:10,padding:12} } } }
+    });
+  }
 
   // Friction table
   const ftBody = document.querySelector('#u-friction-table tbody');
