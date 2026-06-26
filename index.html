@@ -721,9 +721,25 @@ function render(d) {
   document.getElementById('kpi-l1').textContent = l1pr+'%';
   const l5plus = d.reached[4]||0;
   document.getElementById('kpi-l5').textContent = l5plus;
-  const l4sr = d.successRate[3]||0;
-  document.getElementById('kpi-l4').textContent = 'L4';
-  document.getElementById('kpi-l4-sub').textContent = l4sr+'% pass, '+(d.attemptsToPass[3]||'?')+' avg tries';
+
+  // Bottleneck = level with lowest pass rate, among levels with a meaningful sample (reached >= 10, or >= 30% of L1 reach)
+  const minSample = Math.max(5, Math.round((d.reached[0]||0) * 0.1));
+  let bottleneckIdx = -1, bottleneckRate = 101;
+  d.successRate.forEach((sr, i) => {
+    if((d.reached[i]||0) >= minSample && sr < bottleneckRate) {
+      bottleneckRate = sr;
+      bottleneckIdx = i;
+    }
+  });
+  if(bottleneckIdx >= 0) {
+    document.getElementById('kpi-l4').textContent = d.levels[bottleneckIdx];
+    document.getElementById('kpi-l4-sub').textContent =
+      bottleneckRate+'% pass, '+(d.attemptsToPass[bottleneckIdx]||'?')+' avg tries';
+  } else {
+    document.getElementById('kpi-l4').textContent = '—';
+    document.getElementById('kpi-l4-sub').textContent = 'not enough data';
+  }
+
   document.getElementById('kpi-ret').textContent = Math.round(d.returnedUsers/d.totalUsers*100)+'%';
 
   // Funnel
